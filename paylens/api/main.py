@@ -8,6 +8,7 @@ Endpoints:
   GET  /api/health                    -> liveness + data horizon
   POST /api/demo/seed                 -> generate + ingest the demo dataset
   POST /api/investigations            -> run the agent investigation
+  POST /api/uploads                   -> bring-your-own-data: CSV upload -> same governed analysis
   GET  /api/investigations            -> list investigations
   GET  /api/investigations/{run_id}   -> full report incl. provenance
   GET  /api/metrics/success-rate      -> versioned metric, optional grouping
@@ -24,7 +25,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -104,6 +105,41 @@ def demo_seed(
 @app.post("/api/investigations")
 def create_investigation(req: InvestigateRequest) -> dict:
     result = run_investigation(req.question, metric_version=req.metric_version)
+    return JSONResponse(result)
+
+
+@app.post("/api/uploads")
+def upload_csv(file: UploadFile) -> dict:
+    """Bring-your-own-data: analyze an uploaded payments CSV export.
+
+    One row per payment attempt (schema: see the web console's Analyze Data
+    tab). The file streams straight through the canonical event pipeline -
+    governed ingest, governed SQL, audited agents - so the report is the
+    same artifact the demo and real-source paths produce. Store semantics
+    match the demo: reproducible, never additive (each upload replaces the
+    dataset). Hard size cap: 200 MB."""
+    import csv  # noqa: F401  (kept for clarity: _stream yields raw CSV lines)
+
+    from fastapi import HTTPException
+
+    from paylens.realdata.csv_upload import CsvUploadError, run_csv_investigation
+
+    max_bytes = 200 * 1024 * 1024
+    total = 0
+
+    def _stream():
+        nonlocal total
+        for raw in file.file:
+            total += len(raw)
+            if total > max_bytes:
+                raise HTTPException(status_code=413,
+                                    detail="file exceeds the 200 MB upload cap")
+            yield raw.decode("utf-8-sig", errors="replace")
+
+    try:
+        result = run_csv_investigation(_stream())
+    except CsvUploadError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return JSONResponse(result)
 
 

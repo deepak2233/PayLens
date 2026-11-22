@@ -71,6 +71,30 @@ It stays fully functional as a static site; to browse fresh data, run the
 API locally (`uvicorn paylens.api.main:app --port 8000`) and connect from
 the **Connect / Deploy** tab.
 
+## Analyze your own data
+
+Three paths into the same governed analysis, depending on volume and
+context (packaging notes: [SERVICES.md](SERVICES.md)):
+
+| Path | Volume | What happens |
+|---|---|---|
+| **Web console — Analyze Data tab** | up to ~100 MB / 1 M rows | the CSV is parsed and analyzed entirely in your browser; nothing is uploaded anywhere. Same window semantics (last 24 h vs previous 24 h), same metric v2, funnel/segment/anomaly/A-B readouts |
+| **CLI** | any (local machine) | `python cli.py analyze --csv your.csv` — streams the rows through the canonical event pipeline (governed ingest, governed SQL, audited agents) and writes `paylens_upload_report.json` |
+| **API** | up to 200 MB per file | `POST /api/uploads` (multipart) — same pipeline server-side; returns the full report JSON with provenance |
+
+The CSV schema is one row per payment attempt: `attempt_id`, `started_at`
+(ISO timestamp; the file must span two full days), `stage_reached`
+(started / method_selected / initiated / succeeded / failed / pending),
+optional dimensions (`method`, `gateway`, `bank`, `app_version`, `geo`,
+`customer_tier`) and optional A/B columns (`experiment_id`, `variant`).
+Download the template from the console's **Analyze Data** tab. Uploads run
+against a fresh store (reproducible, never additive) and never require PII
+— pass a pseudonymised `customer_id` or none at all.
+
+```bash
+python cli.py analyze --csv your.csv        # full report + governed-query audit
+```
+
 ## The reference scenario (bundled synthetic data)
 
 Two days of traffic (~92% success on day 1). At 10:15 on day 2, an

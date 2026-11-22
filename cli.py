@@ -111,6 +111,28 @@ def cmd_investigate(args: argparse.Namespace) -> None:
     print(json.dumps(result["report"], indent=2, default=str))
 
 
+def cmd_analyze(args: argparse.Namespace) -> None:
+    from paylens.realdata.csv_upload import CsvUploadError, run_csv_investigation
+
+    try:
+        result = run_csv_investigation(args.csv, question=args.question)
+    except CsvUploadError as exc:
+        raise SystemExit(f"upload rejected: {exc}") from exc
+    report = result["report"]
+    print(f"== upload ingested: {result['upload_stats']} ==")
+    print(f"\nrun_id: {result['run_id']}")
+    print(f"\nFINDING\n{report.get('finding')}\n")
+    print("EVIDENCE")
+    for bullet in report.get("evidence", []):
+        print(f"  - {bullet}")
+    print("\nRECOMMENDED ACTIONS")
+    for i, action in enumerate(report.get("recommended_actions", []), 1):
+        print(f"  {i}. {action}")
+    out = Path(args.out)
+    dump_report(result, out)
+    print(f"\nFull report JSON: {out}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="PayLens demo CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -128,6 +150,15 @@ def main() -> None:
     inv = sub.add_parser("investigate", help="run one investigation against existing data")
     inv.add_argument("question", type=str)
     inv.set_defaults(func=cmd_investigate)
+
+    ana = sub.add_parser("analyze",
+                         help="analyze your own CSV export (one row per payment attempt)")
+    ana.add_argument("--csv", type=str, required=True,
+                     help="path to the CSV file (schema in the web console's Analyze Data tab)")
+    ana.add_argument("--question", type=str, default=None,
+                     help="override the investigation question")
+    ana.add_argument("--out", type=str, default="paylens_upload_report.json")
+    ana.set_defaults(func=cmd_analyze)
 
     real = sub.add_parser("real-data",
                           help="real open-source data end-to-end (Olist + Upworthy)")

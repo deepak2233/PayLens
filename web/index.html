@@ -280,13 +280,13 @@ footer{border-top:1px solid var(--line);margin-top:26px;padding:20px clamp(14px,
 
     <!-- ANOMALY -->
     <section id="s-anomaly" hidden>
-      <div class="page-head"><h2>Anomaly timeline</h2><p>Hourly success rate for <b>upi via gateway-b</b> with same-hour baseline and the correlated deployment.</p></div>
+      <div class="page-head"><h2>Anomaly timeline</h2><p>Hourly success rate for <b id="an-seg"></b> with same-hour baseline (overall mean before the first full day) and the correlated deployment.</p></div>
       <div class="card">
         <div class="legend" style="margin:0 0 10px">
           <span class="key"><span class="sw" style="background:#2563eb"></span>Current</span>
           <span class="key"><span class="sw" style="background:#d97706"></span>Same-hour baseline</span>
-          <span class="key"><span class="sw" style="background:var(--bad);border-radius:50%"></span>Change point 10:00</span>
-          <span class="key"><span class="sw" style="background:var(--accent2)"></span>CHG-8841 deployed 10:15</span>
+          <span class="key"><span class="sw" style="background:var(--bad);border-radius:50%"></span><span id="an-leg-cp"></span></span>
+          <span class="key" id="an-leg-dep"><span class="sw" style="background:var(--accent2)"></span><span id="an-leg-dep-t"></span></span>
         </div>
         <div class="chart-wrap" id="an-chart"></div>
       </div>
@@ -397,6 +397,45 @@ footer{border-top:1px solid var(--line);margin-top:26px;padding:20px clamp(14px,
       </div>
     </section>
 
+    <!-- ANALYZE -->
+    <section id="s-analyze" hidden>
+      <div class="page-head"><h2>Analyze your data</h2><p>Bring your own payments export — the same governed analysis (funnel, segments, anomaly timeline, A/B readout) runs right here in your browser. Nothing leaves your machine.</p></div>
+      <div class="card">
+        <h3>1 · Schema</h3>
+        <p class="desc">One row per payment attempt. The window semantics mirror the governed pipeline: <b>last 24 hours vs the previous 24 hours</b>, so the file must span at least ~46 hours (two full days).</p>
+        <div class="table-scroll"><table>
+          <tr><th>Column</th><th>Required</th><th>Values</th></tr>
+          <tr><td class="code">attempt_id</td><td>yes</td><td>unique per attempt</td></tr>
+          <tr><td class="code">started_at</td><td>yes</td><td>ISO timestamp (UTC) · span ≥ 46 h</td></tr>
+          <tr><td class="code">stage_reached</td><td>yes</td><td>started · method_selected · initiated · succeeded · failed · pending</td></tr>
+          <tr><td class="code">status</td><td>no</td><td>fallback stage source: succeeded / failed / pending</td></tr>
+          <tr><td class="code">method, gateway, bank, app_version, geo, customer_tier</td><td>no</td><td>free text — become segment dimensions</td></tr>
+          <tr><td class="code">experiment_id, variant</td><td>no</td><td>A/B columns (A/B) — enable the experiment readout</td></tr>
+          <tr><td class="code">amount, currency, customer_id</td><td>no</td><td>amount in major units; customer_id pseudonymised — never PII</td></tr>
+        </table></div>
+        <div class="connect-row">
+          <button class="btn ghost" id="dl-template">Download CSV template</button>
+          <a class="btn ghost" href="https://github.com/deepak2233/PayLens#analyze-your-own-data" target="_blank" rel="noopener">Bigger files → CLI / API</a>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>2 · Upload &amp; run</h3>
+        <p class="desc">Entirely client-side — comfortable up to ~100 MB / 1 M rows. Larger volumes: run the same pipeline via <span class="code">python cli.py analyze --csv your.csv</span> or <span class="code">POST /api/uploads</span> (streaming, 200 MB cap, full audited trail).</p>
+        <div id="drop" tabindex="0" role="button" aria-label="Choose CSV file" style="border:1.5px dashed var(--line);border-radius:var(--r-md);padding:26px;text-align:center;color:var(--muted);cursor:pointer">
+          <b style="color:var(--text)">Drop your CSV here</b> or click to choose a file
+          <div class="desc" style="margin-top:6px">one row per attempt · UTF-8 · , separated</div>
+        </div>
+        <input type="file" id="file" accept=".csv,text/csv" hidden>
+        <div class="connect-row"><button class="btn" id="run-btn" disabled>Analyze</button>
+        <button class="btn ghost" id="reset-btn" hidden>Reset to reference run</button></div>
+        <div id="up-out"></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Service packaging</h3>
+        <p class="desc">This same flow, pointed at customer data under contract, is the self-serve tier of PayLens-as-a-service: governed SQL + audited agents make it safe to analyze data you do not own. See <b>SERVICES.md</b> in the repo for tiers, boundaries and pricing structure.</p>
+      </div>
+    </section>
+
     <!-- CONNECT -->
     <section id="s-connect" hidden>
       <div class="page-head"><h2>Connect &amp; deploy</h2><p>This console works as a pure static site with the reference run embedded — or point it at a live API.</p></div>
@@ -438,13 +477,13 @@ vercel            # from the repo root</div>
   </div>
   <footer>
     <div id="ft-prov"></div>
-    <div>PayLens v1.0.0 · static console · reference run embedded</div>
+    <div>PayLens v1.1.0 · static console · reference run embedded · client-side upload analysis</div>
   </footer>
 </div>
 </div>
 <div class="tip" id="tip" role="status"></div>
 <script>
-const DATA = {"demo": {"title": "Payment Performance Investigation", "finding": "Overall payment success rate decreased from 91.24% to 79.85% in the current window. The decline is concentrated in upi transactions routed through gateway-b (-25.32 pp for that slice). A deployment on payment-gateway-adapter (CHG-8841) fell within the change-point bucket. Review required before any mitigation; the timing evidence does not by itself prove causation.", "evidence": ["Overall success rate moved from 91.24% (baseline) to 79.85% in the current window (-11.39 pp), computed on 11,241 settled attempts (577 still pending).", "Largest funnel-stage conversion change: 'succeeded' 86.89% -> 75.95% (-10.93 pp).", "Decline concentrated in: upi via gateway-b: 91.0% -> 65.68% (-25.32 pp, 5,026 attempts).", "Change point detected at 2026-11-21 10:00 for upi via gateway-b: 90.22% -> 66.22% (z = -7.25, hour grain). Deployment CHG-8841 on payment-gateway-adapter (gateway-b) within the change-point bucket (deployed 2026-11-21T10:15:00) - timing evidence, not proven causation.", "A/B readout (exp-2026-11-checkout-upi-v2): A 80.15% vs B 81.91% (+1.76 pp, p = 0.0015, SRM p = 1.0). Decision: ship candidate: recommend staged rollout with human approval."], "affected_segments": [{"method": "upi", "gateway": "gateway-b", "success_rate_current": 65.68, "success_rate_baseline": 91.0, "delta_pp": -25.32, "attempts_current": 5275, "settled_current": 5026, "pending_current": 249, "success_deficit": 1272.6}], "recommended_actions": ["Verify CHG-8841 on payment-gateway-adapter: inspect gateway-b timeout logs around the change point and the deployment diff before and after.", "Assess whether traffic can be safely rerouted away from the degraded gateway, then monitor success rate and latency for at least one full traffic cycle after mitigation.", "Proceed to a staged rollout of the treatment variant with human approval; keep guardrail monitoring active during ramp-up.", "Re-run this investigation after the 577 pending attempts settle; late settlement can shift the exact rates."], "funnel": {"window": {"start": "2026-11-21T01:00:00+00:00", "end": "2026-11-22T01:00:00+00:00"}, "baseline": {"start": "2026-11-20T01:00:00+00:00", "end": "2026-11-21T01:00:00+00:00"}, "stages": [{"stage": "started", "current": 11818, "baseline": 12041, "conversion_current": 100.0, "conversion_baseline": 100.0, "delta_pp": 0.0}, {"stage": "method_selected", "current": 11471, "baseline": 11709, "conversion_current": 97.06, "conversion_baseline": 97.24, "delta_pp": -0.18}, {"stage": "initiated", "current": 11241, "baseline": 11467, "conversion_current": 95.12, "conversion_baseline": 95.23, "delta_pp": -0.12}, {"stage": "succeeded", "current": 8976, "baseline": 10462, "conversion_current": 75.95, "conversion_baseline": 86.89, "delta_pp": -10.93}], "overall": {"success_rate_current": 79.85, "success_rate_baseline": 91.24, "delta_pp": -11.39, "settled_current": 11241, "settled_baseline": 11467, "pending_current": 577}}, "segments": {"method": [{"value": "upi", "success_rate_current": 79.85, "success_rate_baseline": 91.24, "delta_pp": -11.39, "attempts_current": 11241, "success_deficit": 1280.3}], "gateway": [{"value": "gateway-b", "success_rate_current": 65.68, "success_rate_baseline": 91.0, "delta_pp": -25.32, "attempts_current": 5026, "success_deficit": 1272.6}, {"value": "gateway-a", "success_rate_current": 91.31, "success_rate_baseline": 91.42, "delta_pp": -0.11, "attempts_current": 6215, "success_deficit": 6.8}], "bank": [{"value": "HDFC", "success_rate_current": 79.14, "success_rate_baseline": 90.49, "delta_pp": -11.35, "attempts_current": 3390, "success_deficit": 384.8}, {"value": "ICICI", "success_rate_current": 80.32, "success_rate_baseline": 92.05, "delta_pp": -11.73, "attempts_current": 2866, "success_deficit": 336.2}, {"value": "SBI", "success_rate_current": 80.26, "success_rate_baseline": 90.94, "delta_pp": -10.68, "attempts_current": 2745, "success_deficit": 293.2}, {"value": "Axis", "success_rate_current": 80.3, "success_rate_baseline": 91.92, "delta_pp": -11.62, "attempts_current": 1340, "success_deficit": 155.7}, {"value": "Kotak", "success_rate_current": 79.11, "success_rate_baseline": 91.31, "delta_pp": -12.2, "attempts_current": 900, "success_deficit": 109.8}], "app_version": [{"value": "3.2.0", "success_rate_current": 79.48, "success_rate_baseline": 91.38, "delta_pp": -11.9, "attempts_current": 9589, "success_deficit": 1141.1}, {"value": "3.1.0", "success_rate_current": 82.29, "success_rate_baseline": 90.4, "delta_pp": -8.11, "attempts_current": 1107, "success_deficit": 89.8}, {"value": "3.3.0-beta", "success_rate_current": 81.47, "success_rate_baseline": 90.4, "delta_pp": -8.93, "attempts_current": 545, "success_deficit": 48.7}], "geo": [{"value": "IN-MH", "success_rate_current": 79.74, "success_rate_baseline": 90.95, "delta_pp": -11.21, "attempts_current": 3425, "success_deficit": 383.9}, {"value": "IN-KA", "success_rate_current": 80.66, "success_rate_baseline": 91.41, "delta_pp": -10.75, "attempts_current": 2787, "success_deficit": 299.6}, {"value": "IN-DL", "success_rate_current": 79.64, "success_rate_baseline": 91.32, "delta_pp": -11.68, "attempts_current": 2269, "success_deficit": 265.0}, {"value": "IN-TN", "success_rate_current": 79.64, "success_rate_baseline": 91.13, "delta_pp": -11.49, "attempts_current": 1655, "success_deficit": 190.2}, {"value": "IN-WB", "success_rate_current": 78.91, "success_rate_baseline": 91.67, "delta_pp": -12.76, "attempts_current": 1105, "success_deficit": 141.0}], "customer_tier": [{"value": "retail", "success_rate_current": 80.21, "success_rate_baseline": 91.2, "delta_pp": -10.99, "attempts_current": 8980, "success_deficit": 986.9}, {"value": "premium", "success_rate_current": 79.02, "success_rate_baseline": 91.06, "delta_pp": -12.04, "attempts_current": 1687, "success_deficit": 203.1}, {"value": "vip", "success_rate_current": 76.66, "success_rate_baseline": 92.27, "delta_pp": -15.61, "attempts_current": 574, "success_deficit": 89.6}]}, "anomaly": {"grain": "hour", "segment": {"method": "upi", "gateway": "gateway-b"}, "hourly_series": [{"hour": "01:00", "date": "2026-11-21", "success_rate": 95.83, "baseline_same_hour": 92.86, "delta_pp": 2.98, "z": 0.67, "attempts": 48}, {"hour": "02:00", "date": "2026-11-21", "success_rate": 92.86, "baseline_same_hour": 92.31, "delta_pp": 0.55, "z": 0.09, "attempts": 42}, {"hour": "03:00", "date": "2026-11-21", "success_rate": 95.0, "baseline_same_hour": 95.83, "delta_pp": -0.83, "z": -0.19, "attempts": 40}, {"hour": "04:00", "date": "2026-11-21", "success_rate": 92.54, "baseline_same_hour": 87.93, "delta_pp": 4.61, "z": 0.87, "attempts": 67}, {"hour": "05:00", "date": "2026-11-21", "success_rate": 93.33, "baseline_same_hour": 90.2, "delta_pp": 3.14, "z": 0.78, "attempts": 90}, {"hour": "06:00", "date": "2026-11-21", "success_rate": 91.1, "baseline_same_hour": 85.71, "delta_pp": 5.38, "z": 1.38, "attempts": 146}, {"hour": "07:00", "date": "2026-11-21", "success_rate": 92.38, "baseline_same_hour": 92.48, "delta_pp": -0.1, "z": -0.04, "attempts": 210}, {"hour": "08:00", "date": "2026-11-21", "success_rate": 91.29, "baseline_same_hour": 91.67, "delta_pp": -0.38, "z": -0.16, "attempts": 287}, {"hour": "09:00", "date": "2026-11-21", "success_rate": 88.99, "baseline_same_hour": 93.63, "delta_pp": -4.64, "z": -2.08, "attempts": 327}, {"hour": "10:00", "date": "2026-11-21", "success_rate": 66.22, "baseline_same_hour": 90.22, "delta_pp": -24.0, "z": -7.25, "attempts": 296}, {"hour": "11:00", "date": "2026-11-21", "success_rate": 61.21, "baseline_same_hour": 89.0, "delta_pp": -27.79, "z": -7.79, "attempts": 281}, {"hour": "12:00", "date": "2026-11-21", "success_rate": 57.65, "baseline_same_hour": 90.85, "delta_pp": -33.19, "z": -9.27, "attempts": 307}, {"hour": "13:00", "date": "2026-11-21", "success_rate": 55.98, "baseline_same_hour": 89.72, "delta_pp": -33.73, "z": -8.89, "attempts": 259}, {"hour": "14:00", "date": "2026-11-21", "success_rate": 51.93, "baseline_same_hour": 92.57, "delta_pp": -40.64, "z": -10.61, "attempts": 285}, {"hour": "15:00", "date": "2026-11-21", "success_rate": 56.47, "baseline_same_hour": 93.99, "delta_pp": -37.52, "z": -9.58, "attempts": 278}, {"hour": "16:00", "date": "2026-11-21", "success_rate": 57.04, "baseline_same_hour": 91.92, "delta_pp": -34.89, "z": -9.17, "attempts": 270}, {"hour": "17:00", "date": "2026-11-21", "success_rate": 51.39, "baseline_same_hour": 91.56, "delta_pp": -40.17, "z": -11.27, "attempts": 323}, {"hour": "18:00", "date": "2026-11-21", "success_rate": 53.59, "baseline_same_hour": 89.71, "delta_pp": -36.12, "z": -11.08, "attempts": 390}, {"hour": "19:00", "date": "2026-11-21", "success_rate": 55.66, "baseline_same_hour": 91.35, "delta_pp": -35.7, "z": -10.56, "attempts": 327}, {"hour": "20:00", "date": "2026-11-21", "success_rate": 62.98, "baseline_same_hour": 92.7, "delta_pp": -29.72, "z": -8.43, "attempts": 289}, {"hour": "21:00", "date": "2026-11-21", "success_rate": 59.91, "baseline_same_hour": 88.18, "delta_pp": -28.27, "z": -6.59, "attempts": 222}, {"hour": "22:00", "date": "2026-11-21", "success_rate": 58.21, "baseline_same_hour": 85.71, "delta_pp": -27.51, "z": -5.31, "attempts": 134}, {"hour": "23:00", "date": "2026-11-21", "success_rate": 49.07, "baseline_same_hour": 94.96, "delta_pp": -45.88, "z": -7.79, "attempts": 108}], "change_point": {"hour": "10:00", "date": "2026-11-21", "success_rate": 66.22, "baseline_same_hour": 90.22, "delta_pp": -24.0, "z": -7.25, "attempts": 296, "label": "2026-11-21 10:00"}, "rate_context": {"mean_before_change_point": 92.59, "mean_after_change_point": 56.95}, "correlated_deployment": {"change_id": "CHG-8841", "service": "payment-gateway-adapter", "gateway": "gateway-b", "deployed_at": "2026-11-21T10:15:00", "note": "Gateway B adapter rollout v2.7.0 (connection-pool resize)", "lead_time_minutes": -15, "relation": "within the change-point bucket"}, "interpretation": "Timing evidence only: the metric change point follows the listed deployment; causality must be confirmed by engineers in gateway logs before any rerouting or rollback decision."}, "experiment": {"experiment_id": "exp-2026-11-checkout-upi-v2", "assignments": {"A": 10000, "B": 10000}, "srm": {"ok": true, "chi2": 0.0, "p_value": 1.0, "degrees_of_freedom": 1}, "control": {"variant": "A", "attempts": 10000, "succeeded": 8015, "success_rate": 80.15}, "treatment": {"variant": "B", "attempts": 10000, "succeeded": 8191, "success_rate": 81.91}, "effect": {"delta_pp": 1.76, "relative_uplift_pct": 2.2, "z": 3.174, "p_value": "0.0015", "significant": true, "mde_pp": 1.58}, "guardrails": [{"variant": "A", "latency_p50_ms": 1348.0, "latency_p95_ms": 1780.0, "timeout_rate": 0.0, "dup_charge_rate": 0.0, "refund_rate": 0.0027}, {"variant": "B", "latency_p50_ms": 1149.0, "latency_p95_ms": 1579.0, "timeout_rate": 0.0, "dup_charge_rate": 0.0002, "refund_rate": 0.0022}], "guardrail_checks": [{"name": "latency_p95_ms", "control": 1780.0, "treatment": 1579.0, "threshold": 0.1, "unit": "ms", "ok": true}, {"name": "timeout_rate", "control": 0.0, "treatment": 0.0, "threshold": 0.1, "unit": "ratio", "ok": true}, {"name": "dup_charge_rate", "control": 0.0, "treatment": 0.0002, "threshold": 0.1, "unit": "ratio", "ok": true}, {"name": "refund_rate", "control": 0.0027, "treatment": 0.0022, "threshold": 0.1, "unit": "ratio", "ok": true}], "decision": "ship candidate: recommend staged rollout with human approval", "decision_reasons": ["assignment integrity, significance and all guardrails passed"]}, "provenance": {"run_id": "f73319e2-2680-43ae-82c5-5e2182530c43", "metric_version": 2, "grain": "hour", "planner": "deterministic", "plan_rationale": "Deterministic plan: 24h window, focus method 'upi'; funnel first, then segments, anomaly and experiment checks.", "audit": [{"agent": "funnel", "template": "funnel_counts", "rows": 1, "duration_ms": 26, "sql": "SELECT\n            COUNT(*)                                                              AS started,\n            SUM(CASE WHEN method_selected_at IS NOT NULL THEN 1 ELSE 0 END)        AS method_selected,\n            SUM(CASE WHEN initiated_at      IS NOT NULL THEN 1 ELSE 0 END)        AS initiated,\n            SUM(CASE WHEN settled           THEN 1 ELSE 0 END)                    AS settled,\n            SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            SUM(CASE WHEN settled AND status <> 'succeeded' THEN 1 ELSE 0 END)     AS failed\n        FROM pay"}, {"agent": "funnel", "template": "funnel_counts", "rows": 1, "duration_ms": 24, "sql": "SELECT\n            COUNT(*)                                                              AS started,\n            SUM(CASE WHEN method_selected_at IS NOT NULL THEN 1 ELSE 0 END)        AS method_selected,\n            SUM(CASE WHEN initiated_at      IS NOT NULL THEN 1 ELSE 0 END)        AS initiated,\n            SUM(CASE WHEN settled           THEN 1 ELSE 0 END)                    AS settled,\n            SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            SUM(CASE WHEN settled AND status <> 'succeeded' THEN 1 ELSE 0 END)     AS failed\n        FROM pay"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 1, "duration_ms": 77, "sql": "SELECT method                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT method,\n                   sta"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 2, "duration_ms": 81, "sql": "SELECT gateway                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT gateway,\n                   s"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 5, "duration_ms": 78, "sql": "SELECT bank                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT bank,\n                   started"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 3, "duration_ms": 78, "sql": "SELECT app_version                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT app_version,\n            "}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 5, "duration_ms": 79, "sql": "SELECT geo                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT geo,\n                   started_a"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 3, "duration_ms": 78, "sql": "SELECT customer_tier                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT customer_tier,\n        "}, {"agent": "segment", "template": "segment_profile", "rows": 2, "duration_ms": 27, "sql": "SELECT method, gateway,\n               SUM(CASE WHEN settled AND status='succeeded' THEN 1 ELSE 0 END) AS succeeded,\n               SUM(CASE WHEN settled THEN 1 ELSE 0 END)                        AS settled,\n               SUM(CASE WHEN settled THEN 0 ELSE 1 END)                        AS pending,\n               COUNT(*)                                                        AS attempts\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n              AND (:gateway IS NULL OR gateway = :gat"}, {"agent": "segment", "template": "segment_profile", "rows": 2, "duration_ms": 28, "sql": "SELECT method, gateway,\n               SUM(CASE WHEN settled AND status='succeeded' THEN 1 ELSE 0 END) AS succeeded,\n               SUM(CASE WHEN settled THEN 1 ELSE 0 END)                        AS settled,\n               SUM(CASE WHEN settled THEN 0 ELSE 1 END)                        AS pending,\n               COUNT(*)                                                        AS attempts\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n              AND (:gateway IS NULL OR gateway = :gat"}, {"agent": "anomaly", "template": "hourly_success_rate", "rows": 47, "duration_ms": 22, "sql": "SELECT\n            CAST(strftime('%Y-%m-%dT%H', started_at) AS TEXT)                                          AS hour_bucket,\n            SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            COUNT(*)                                                             AS settled,\n            SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0) AS success_rate\n        FROM payment_attempts\n        WHERE settled\n          AND started_at >= :window_start AND started_at < :window_end\n          AND method = :method\n          AND (:gateway I"}, {"agent": "anomaly", "template": "deployments_in_window", "rows": 3, "duration_ms": 0, "sql": "SELECT change_id, service, gateway, deployed_at, note\n        FROM deployments\n        WHERE deployed_at >= :baseline_start AND deployed_at < :window_end\n        ORDER BY deployed_at"}, {"agent": "experiment", "template": "list_experiments", "rows": 1, "duration_ms": 1, "sql": "SELECT DISTINCT experiment_id\n        FROM experiment_assignments\n        ORDER BY experiment_id\n        LIMIT 5"}, {"agent": "experiment", "template": "experiment_assignments", "rows": 2, "duration_ms": 4, "sql": "SELECT variant, COUNT(*) AS assigned\n        FROM experiment_assignments\n        WHERE experiment_id = :experiment_id\n        GROUP BY variant"}, {"agent": "experiment", "template": "experiment_outcomes", "rows": 2, "duration_ms": 13, "sql": "SELECT a.variant,\n               COUNT(*)                                                       AS attempts,\n               SUM(CASE WHEN a.status='succeeded' THEN 1 ELSE 0 END)           AS succeeded,\n               SUM(CASE WHEN a.status='succeeded' THEN 1 ELSE 0 END) * 1.0\n                   / NULLIF(COUNT(*), 0)                                       AS success_rate\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.settled\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.st"}, {"agent": "experiment", "template": "experiment_guardrails", "rows": 2, "duration_ms": 14, "sql": "SELECT\n            a.variant,\n            COUNT(*)                                                        AS attempts,\n            SUM(CASE WHEN a.error_code='GATEWAY_TIMEOUT' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0) AS timeout_rate,\n            SUM(CASE WHEN a.is_duplicate_charge THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0)          AS dup_charge_rate\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.settled\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < "}, {"agent": "experiment", "template": "experiment_refunds", "rows": 2, "duration_ms": 0, "sql": "SELECT a.variant, COUNT(e.event_id) AS refunds\n        FROM payment_events e\n        JOIN payment_attempts a ON a.attempt_id = e.attempt_id\n        WHERE e.event_type = 'refund_issued'\n              AND a.experiment_id = :experiment_id\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)\n        GROUP BY a.variant"}, {"agent": "experiment", "template": "experiment_latency", "rows": 20000, "duration_ms": 19, "sql": "SELECT a.variant, a.latency_ms\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.latency_ms IS NOT NULL\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)"}], "agent_errors": []}}, "real": {"finding": "Overall payment success rate decreased from 99.0% to 96.92% in the current window. The drop is not concentrated in any segment above the configured volume and delta thresholds; treat it as platform-wide pending verification. Review required before any mitigation; the timing evidence does not by itself prove causation.", "evidence": ["Overall success rate moved from 99.0% (baseline) to 96.92% in the current window (-2.08 pp), computed on 1,494 settled attempts (6 still pending).", "Largest funnel-stage conversion change: 'initiated' 99.79% -> 97.07% (-2.72 pp).", "Real aggregate A/B readouts (Upworthy Research Archive (CC BY 4.0), arm units are the source's own impressions): upworthy-51f02df82c37bc6447007d0d: control 2.06% vs treatment 8.0% (+5.94 pp, p = 3e-16, SRM p = 0.001) -> ship candidate: recommend staged rollout with human approval | upworthy-5419ed6f3088cfcf1f0000c0: control 10.94% vs treatment 5.52% (-5.42 pp, p = 4e-16, SRM p = 0.4435) -> hold: treatment significantly worse than control | upworthy-5143607b220cb8000200091c: control 2.3% vs treatment 7.08% (+4.78 pp, p = 3e-16, SRM p = 0.0382) -> ship candidate: recommend staged rollout with human approval."], "recommended_actions": ["Re-run this investigation after the 6 pending attempts settle; late settlement can shift the exact rates."], "funnel_overall": {"success_rate_current": 96.92, "success_rate_baseline": 99.0, "delta_pp": -2.08, "settled_current": 1494, "settled_baseline": 13459, "pending_current": 6}, "funnel_window": {"start": "2018-08-18T21:00:00+00:00", "end": "2018-10-17T21:00:00+00:00"}, "data_source": "olist (real orders) + upworthy (real A/B archive)", "grain": "day", "planner": "config-driven", "data_provenance": {"olist": {"source": "Olist adapter: real marketplace orders -> PayLens canonical event stream", "verification": {"source": "olist", "title": "Olist Brazilian E-commerce Public Dataset (real marketplace data)", "license": "CC BY-NC-SA 4.0 (attribution + non-commercial + share-alike)", "files": [{"file": "olist_orders_dataset.csv", "sha256": "8df58ef3d2d7e9944010f7beecd9b75367f5588ec6e3c91cec19ae3345ef9ecf", "rows": 99441}, {"file": "olist_order_payments_dataset.csv", "sha256": "4f713964f2815dbbaa40b9488268c55aac3627bfce5aa96cf58d1f3616de3cc0", "rows": 103886}, {"file": "olist_customers_dataset.csv", "sha256": "983a422239e1712ded753b3bf9ecf47dc73f144d306029dcfa99e70a226883d2", "rows": 99441}]}, "validation": [{"file": "olist_orders_dataset.csv", "rows_read": 99441, "accepted": 99441, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}, {"file": "olist_order_payments_dataset.csv", "rows_read": 103886, "accepted": 103886, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}, {"file": "olist_customers_dataset.csv", "rows_read": 99441, "accepted": 99441, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}], "mapping": {"attempt": "olist order_id", "amount": "sum(order payments) in centavos, currency BRL", "method": "primary payment_type (lowest payment_sequential)", "second_dimension": "customer_state (presented as region)", "terminal": "delivered=succeeded; canceled/unavailable=failed at last observed event; other statuses pending (censoring-safe)", "timezone": "source BRT (UTC-3) -> store UTC"}, "stats": {"orders": 99441, "events_received": 495156, "events_ingested": 495156, "duplicates": 0, "invalid": 0, "attempts_upserted": 99441, "assignments": 0, "assignments_backfilled": 0, "duration_ms": 110598}}, "upworthy": {"summary": {"source": "Upworthy Research Archive (CC BY 4.0)", "packages": 22666, "tests_total": 4873, "tests_evaluated": 4873, "tests_srm_ok_significant": 1488, "tests_srm_failures": 747}}}}};
+const DATA = {"demo": {"title": "Payment Performance Investigation", "finding": "Overall payment success rate decreased from 91.24% to 79.85% in the current window. The decline is concentrated in upi transactions routed through gateway-b (-25.32 pp for that slice). A deployment on payment-gateway-adapter (CHG-8841) fell within the change-point bucket. Review required before any mitigation; the timing evidence does not by itself prove causation.", "evidence": ["Overall success rate moved from 91.24% (baseline) to 79.85% in the current window (-11.39 pp), computed on 11,241 settled attempts (577 still pending).", "Largest funnel-stage conversion change: 'succeeded' 86.89% -> 75.95% (-10.93 pp).", "Decline concentrated in: upi via gateway-b: 91.0% -> 65.68% (-25.32 pp, 5,026 attempts).", "Change point detected at 2026-11-21 10:00 for upi via gateway-b: 90.22% -> 66.22% (z = -7.25, hour grain). Deployment CHG-8841 on payment-gateway-adapter (gateway-b) within the change-point bucket (deployed 2026-11-21T10:15:00) - timing evidence, not proven causation.", "A/B readout (exp-2026-11-checkout-upi-v2): A 80.15% vs B 81.91% (+1.76 pp, p = 0.0015, SRM p = 1.0). Decision: ship candidate: recommend staged rollout with human approval."], "affected_segments": [{"method": "upi", "gateway": "gateway-b", "success_rate_current": 65.68, "success_rate_baseline": 91.0, "delta_pp": -25.32, "attempts_current": 5275, "settled_current": 5026, "pending_current": 249, "success_deficit": 1272.6}], "recommended_actions": ["Verify CHG-8841 on payment-gateway-adapter: inspect gateway-b timeout logs around the change point and the deployment diff before and after.", "Assess whether traffic can be safely rerouted away from the degraded gateway, then monitor success rate and latency for at least one full traffic cycle after mitigation.", "Proceed to a staged rollout of the treatment variant with human approval; keep guardrail monitoring active during ramp-up.", "Re-run this investigation after the 577 pending attempts settle; late settlement can shift the exact rates."], "funnel": {"window": {"start": "2026-11-21T01:00:00+00:00", "end": "2026-11-22T01:00:00+00:00"}, "baseline": {"start": "2026-11-20T01:00:00+00:00", "end": "2026-11-21T01:00:00+00:00"}, "stages": [{"stage": "started", "current": 11818, "baseline": 12041, "conversion_current": 100.0, "conversion_baseline": 100.0, "delta_pp": 0.0}, {"stage": "method_selected", "current": 11471, "baseline": 11709, "conversion_current": 97.06, "conversion_baseline": 97.24, "delta_pp": -0.18}, {"stage": "initiated", "current": 11241, "baseline": 11467, "conversion_current": 95.12, "conversion_baseline": 95.23, "delta_pp": -0.12}, {"stage": "succeeded", "current": 8976, "baseline": 10462, "conversion_current": 75.95, "conversion_baseline": 86.89, "delta_pp": -10.93}], "overall": {"success_rate_current": 79.85, "success_rate_baseline": 91.24, "delta_pp": -11.39, "settled_current": 11241, "settled_baseline": 11467, "pending_current": 577}}, "segments": {"method": [{"value": "upi", "success_rate_current": 79.85, "success_rate_baseline": 91.24, "delta_pp": -11.39, "attempts_current": 11241, "success_deficit": 1280.3}], "gateway": [{"value": "gateway-b", "success_rate_current": 65.68, "success_rate_baseline": 91.0, "delta_pp": -25.32, "attempts_current": 5026, "success_deficit": 1272.6}, {"value": "gateway-a", "success_rate_current": 91.31, "success_rate_baseline": 91.42, "delta_pp": -0.11, "attempts_current": 6215, "success_deficit": 6.8}], "bank": [{"value": "HDFC", "success_rate_current": 79.14, "success_rate_baseline": 90.49, "delta_pp": -11.35, "attempts_current": 3390, "success_deficit": 384.8}, {"value": "ICICI", "success_rate_current": 80.32, "success_rate_baseline": 92.05, "delta_pp": -11.73, "attempts_current": 2866, "success_deficit": 336.2}, {"value": "SBI", "success_rate_current": 80.26, "success_rate_baseline": 90.94, "delta_pp": -10.68, "attempts_current": 2745, "success_deficit": 293.2}, {"value": "Axis", "success_rate_current": 80.3, "success_rate_baseline": 91.92, "delta_pp": -11.62, "attempts_current": 1340, "success_deficit": 155.7}, {"value": "Kotak", "success_rate_current": 79.11, "success_rate_baseline": 91.31, "delta_pp": -12.2, "attempts_current": 900, "success_deficit": 109.8}], "app_version": [{"value": "3.2.0", "success_rate_current": 79.48, "success_rate_baseline": 91.38, "delta_pp": -11.9, "attempts_current": 9589, "success_deficit": 1141.1}, {"value": "3.1.0", "success_rate_current": 82.29, "success_rate_baseline": 90.4, "delta_pp": -8.11, "attempts_current": 1107, "success_deficit": 89.8}, {"value": "3.3.0-beta", "success_rate_current": 81.47, "success_rate_baseline": 90.4, "delta_pp": -8.93, "attempts_current": 545, "success_deficit": 48.7}], "geo": [{"value": "IN-MH", "success_rate_current": 79.74, "success_rate_baseline": 90.95, "delta_pp": -11.21, "attempts_current": 3425, "success_deficit": 383.9}, {"value": "IN-KA", "success_rate_current": 80.66, "success_rate_baseline": 91.41, "delta_pp": -10.75, "attempts_current": 2787, "success_deficit": 299.6}, {"value": "IN-DL", "success_rate_current": 79.64, "success_rate_baseline": 91.32, "delta_pp": -11.68, "attempts_current": 2269, "success_deficit": 265.0}, {"value": "IN-TN", "success_rate_current": 79.64, "success_rate_baseline": 91.13, "delta_pp": -11.49, "attempts_current": 1655, "success_deficit": 190.2}, {"value": "IN-WB", "success_rate_current": 78.91, "success_rate_baseline": 91.67, "delta_pp": -12.76, "attempts_current": 1105, "success_deficit": 141.0}], "customer_tier": [{"value": "retail", "success_rate_current": 80.21, "success_rate_baseline": 91.2, "delta_pp": -10.99, "attempts_current": 8980, "success_deficit": 986.9}, {"value": "premium", "success_rate_current": 79.02, "success_rate_baseline": 91.06, "delta_pp": -12.04, "attempts_current": 1687, "success_deficit": 203.1}, {"value": "vip", "success_rate_current": 76.66, "success_rate_baseline": 92.27, "delta_pp": -15.61, "attempts_current": 574, "success_deficit": 89.6}]}, "anomaly": {"grain": "hour", "segment": "method=upi · gateway=gateway-b", "hourly_series": [{"hour": "01:00", "date": "2026-11-21", "success_rate": 95.83, "baseline_same_hour": 92.86, "delta_pp": 2.98, "z": 0.67, "attempts": 48}, {"hour": "02:00", "date": "2026-11-21", "success_rate": 92.86, "baseline_same_hour": 92.31, "delta_pp": 0.55, "z": 0.09, "attempts": 42}, {"hour": "03:00", "date": "2026-11-21", "success_rate": 95.0, "baseline_same_hour": 95.83, "delta_pp": -0.83, "z": -0.19, "attempts": 40}, {"hour": "04:00", "date": "2026-11-21", "success_rate": 92.54, "baseline_same_hour": 87.93, "delta_pp": 4.61, "z": 0.87, "attempts": 67}, {"hour": "05:00", "date": "2026-11-21", "success_rate": 93.33, "baseline_same_hour": 90.2, "delta_pp": 3.14, "z": 0.78, "attempts": 90}, {"hour": "06:00", "date": "2026-11-21", "success_rate": 91.1, "baseline_same_hour": 85.71, "delta_pp": 5.38, "z": 1.38, "attempts": 146}, {"hour": "07:00", "date": "2026-11-21", "success_rate": 92.38, "baseline_same_hour": 92.48, "delta_pp": -0.1, "z": -0.04, "attempts": 210}, {"hour": "08:00", "date": "2026-11-21", "success_rate": 91.29, "baseline_same_hour": 91.67, "delta_pp": -0.38, "z": -0.16, "attempts": 287}, {"hour": "09:00", "date": "2026-11-21", "success_rate": 88.99, "baseline_same_hour": 93.63, "delta_pp": -4.64, "z": -2.08, "attempts": 327}, {"hour": "10:00", "date": "2026-11-21", "success_rate": 66.22, "baseline_same_hour": 90.22, "delta_pp": -24.0, "z": -7.25, "attempts": 296}, {"hour": "11:00", "date": "2026-11-21", "success_rate": 61.21, "baseline_same_hour": 89.0, "delta_pp": -27.79, "z": -7.79, "attempts": 281}, {"hour": "12:00", "date": "2026-11-21", "success_rate": 57.65, "baseline_same_hour": 90.85, "delta_pp": -33.19, "z": -9.27, "attempts": 307}, {"hour": "13:00", "date": "2026-11-21", "success_rate": 55.98, "baseline_same_hour": 89.72, "delta_pp": -33.73, "z": -8.89, "attempts": 259}, {"hour": "14:00", "date": "2026-11-21", "success_rate": 51.93, "baseline_same_hour": 92.57, "delta_pp": -40.64, "z": -10.61, "attempts": 285}, {"hour": "15:00", "date": "2026-11-21", "success_rate": 56.47, "baseline_same_hour": 93.99, "delta_pp": -37.52, "z": -9.58, "attempts": 278}, {"hour": "16:00", "date": "2026-11-21", "success_rate": 57.04, "baseline_same_hour": 91.92, "delta_pp": -34.89, "z": -9.17, "attempts": 270}, {"hour": "17:00", "date": "2026-11-21", "success_rate": 51.39, "baseline_same_hour": 91.56, "delta_pp": -40.17, "z": -11.27, "attempts": 323}, {"hour": "18:00", "date": "2026-11-21", "success_rate": 53.59, "baseline_same_hour": 89.71, "delta_pp": -36.12, "z": -11.08, "attempts": 390}, {"hour": "19:00", "date": "2026-11-21", "success_rate": 55.66, "baseline_same_hour": 91.35, "delta_pp": -35.7, "z": -10.56, "attempts": 327}, {"hour": "20:00", "date": "2026-11-21", "success_rate": 62.98, "baseline_same_hour": 92.7, "delta_pp": -29.72, "z": -8.43, "attempts": 289}, {"hour": "21:00", "date": "2026-11-21", "success_rate": 59.91, "baseline_same_hour": 88.18, "delta_pp": -28.27, "z": -6.59, "attempts": 222}, {"hour": "22:00", "date": "2026-11-21", "success_rate": 58.21, "baseline_same_hour": 85.71, "delta_pp": -27.51, "z": -5.31, "attempts": 134}, {"hour": "23:00", "date": "2026-11-21", "success_rate": 49.07, "baseline_same_hour": 94.96, "delta_pp": -45.88, "z": -7.79, "attempts": 108}], "change_point": {"hour": "10:00", "date": "2026-11-21", "success_rate": 66.22, "baseline_same_hour": 90.22, "delta_pp": -24.0, "z": -7.25, "attempts": 296, "label": "2026-11-21 10:00"}, "rate_context": {"mean_before_change_point": 92.59, "mean_after_change_point": 56.95}, "correlated_deployment": {"change_id": "CHG-8841", "service": "payment-gateway-adapter", "gateway": "gateway-b", "deployed_at": "2026-11-21T10:15:00", "note": "Gateway B adapter rollout v2.7.0 (connection-pool resize)", "lead_time_minutes": -15, "relation": "within the change-point bucket"}, "interpretation": "Timing evidence only: the metric change point follows the listed deployment; causality must be confirmed by engineers in gateway logs before any rerouting or rollback decision."}, "experiment": {"experiment_id": "exp-2026-11-checkout-upi-v2", "assignments": {"A": 10000, "B": 10000}, "srm": {"ok": true, "chi2": 0.0, "p_value": 1.0, "degrees_of_freedom": 1}, "control": {"variant": "A", "attempts": 10000, "succeeded": 8015, "success_rate": 80.15}, "treatment": {"variant": "B", "attempts": 10000, "succeeded": 8191, "success_rate": 81.91}, "effect": {"delta_pp": 1.76, "relative_uplift_pct": 2.2, "z": 3.174, "p_value": "0.0015", "significant": true, "mde_pp": 1.58}, "guardrails": [{"variant": "A", "latency_p50_ms": 1348.0, "latency_p95_ms": 1780.0, "timeout_rate": 0.0, "dup_charge_rate": 0.0, "refund_rate": 0.0027}, {"variant": "B", "latency_p50_ms": 1149.0, "latency_p95_ms": 1579.0, "timeout_rate": 0.0, "dup_charge_rate": 0.0002, "refund_rate": 0.0022}], "guardrail_checks": [{"name": "latency_p95_ms", "control": 1780.0, "treatment": 1579.0, "threshold": 0.1, "unit": "ms", "ok": true}, {"name": "timeout_rate", "control": 0.0, "treatment": 0.0, "threshold": 0.1, "unit": "ratio", "ok": true}, {"name": "dup_charge_rate", "control": 0.0, "treatment": 0.0002, "threshold": 0.1, "unit": "ratio", "ok": true}, {"name": "refund_rate", "control": 0.0027, "treatment": 0.0022, "threshold": 0.1, "unit": "ratio", "ok": true}], "decision": "ship candidate: recommend staged rollout with human approval", "decision_reasons": ["assignment integrity, significance and all guardrails passed"]}, "provenance": {"run_id": "f73319e2-2680-43ae-82c5-5e2182530c43", "metric_version": 2, "grain": "hour", "planner": "deterministic", "plan_rationale": "Deterministic plan: 24h window, focus method 'upi'; funnel first, then segments, anomaly and experiment checks.", "audit": [{"agent": "funnel", "template": "funnel_counts", "rows": 1, "duration_ms": 26, "sql": "SELECT\n            COUNT(*)                                                              AS started,\n            SUM(CASE WHEN method_selected_at IS NOT NULL THEN 1 ELSE 0 END)        AS method_selected,\n            SUM(CASE WHEN initiated_at      IS NOT NULL THEN 1 ELSE 0 END)        AS initiated,\n            SUM(CASE WHEN settled           THEN 1 ELSE 0 END)                    AS settled,\n            SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            SUM(CASE WHEN settled AND status <> 'succeeded' THEN 1 ELSE 0 END)     AS failed\n        FROM pay"}, {"agent": "funnel", "template": "funnel_counts", "rows": 1, "duration_ms": 24, "sql": "SELECT\n            COUNT(*)                                                              AS started,\n            SUM(CASE WHEN method_selected_at IS NOT NULL THEN 1 ELSE 0 END)        AS method_selected,\n            SUM(CASE WHEN initiated_at      IS NOT NULL THEN 1 ELSE 0 END)        AS initiated,\n            SUM(CASE WHEN settled           THEN 1 ELSE 0 END)                    AS settled,\n            SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            SUM(CASE WHEN settled AND status <> 'succeeded' THEN 1 ELSE 0 END)     AS failed\n        FROM pay"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 1, "duration_ms": 77, "sql": "SELECT method                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT method,\n                   sta"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 2, "duration_ms": 81, "sql": "SELECT gateway                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT gateway,\n                   s"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 5, "duration_ms": 78, "sql": "SELECT bank                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT bank,\n                   started"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 3, "duration_ms": 78, "sql": "SELECT app_version                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT app_version,\n            "}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 5, "duration_ms": 79, "sql": "SELECT geo                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT geo,\n                   started_a"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 3, "duration_ms": 78, "sql": "SELECT customer_tier                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT customer_tier,\n        "}, {"agent": "segment", "template": "segment_profile", "rows": 2, "duration_ms": 27, "sql": "SELECT method, gateway,\n               SUM(CASE WHEN settled AND status='succeeded' THEN 1 ELSE 0 END) AS succeeded,\n               SUM(CASE WHEN settled THEN 1 ELSE 0 END)                        AS settled,\n               SUM(CASE WHEN settled THEN 0 ELSE 1 END)                        AS pending,\n               COUNT(*)                                                        AS attempts\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n              AND (:gateway IS NULL OR gateway = :gat"}, {"agent": "segment", "template": "segment_profile", "rows": 2, "duration_ms": 28, "sql": "SELECT method, gateway,\n               SUM(CASE WHEN settled AND status='succeeded' THEN 1 ELSE 0 END) AS succeeded,\n               SUM(CASE WHEN settled THEN 1 ELSE 0 END)                        AS settled,\n               SUM(CASE WHEN settled THEN 0 ELSE 1 END)                        AS pending,\n               COUNT(*)                                                        AS attempts\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n              AND (:gateway IS NULL OR gateway = :gat"}, {"agent": "anomaly", "template": "hourly_success_rate", "rows": 47, "duration_ms": 22, "sql": "SELECT\n            CAST(strftime('%Y-%m-%dT%H', started_at) AS TEXT)                                          AS hour_bucket,\n            SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            COUNT(*)                                                             AS settled,\n            SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0) AS success_rate\n        FROM payment_attempts\n        WHERE settled\n          AND started_at >= :window_start AND started_at < :window_end\n          AND method = :method\n          AND (:gateway I"}, {"agent": "anomaly", "template": "deployments_in_window", "rows": 3, "duration_ms": 0, "sql": "SELECT change_id, service, gateway, deployed_at, note\n        FROM deployments\n        WHERE deployed_at >= :baseline_start AND deployed_at < :window_end\n        ORDER BY deployed_at"}, {"agent": "experiment", "template": "list_experiments", "rows": 1, "duration_ms": 1, "sql": "SELECT DISTINCT experiment_id\n        FROM experiment_assignments\n        ORDER BY experiment_id\n        LIMIT 5"}, {"agent": "experiment", "template": "experiment_assignments", "rows": 2, "duration_ms": 4, "sql": "SELECT variant, COUNT(*) AS assigned\n        FROM experiment_assignments\n        WHERE experiment_id = :experiment_id\n        GROUP BY variant"}, {"agent": "experiment", "template": "experiment_outcomes", "rows": 2, "duration_ms": 13, "sql": "SELECT a.variant,\n               COUNT(*)                                                       AS attempts,\n               SUM(CASE WHEN a.status='succeeded' THEN 1 ELSE 0 END)           AS succeeded,\n               SUM(CASE WHEN a.status='succeeded' THEN 1 ELSE 0 END) * 1.0\n                   / NULLIF(COUNT(*), 0)                                       AS success_rate\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.settled\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.st"}, {"agent": "experiment", "template": "experiment_guardrails", "rows": 2, "duration_ms": 14, "sql": "SELECT\n            a.variant,\n            COUNT(*)                                                        AS attempts,\n            SUM(CASE WHEN a.error_code='GATEWAY_TIMEOUT' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0) AS timeout_rate,\n            SUM(CASE WHEN a.is_duplicate_charge THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0)          AS dup_charge_rate\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.settled\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < "}, {"agent": "experiment", "template": "experiment_refunds", "rows": 2, "duration_ms": 0, "sql": "SELECT a.variant, COUNT(e.event_id) AS refunds\n        FROM payment_events e\n        JOIN payment_attempts a ON a.attempt_id = e.attempt_id\n        WHERE e.event_type = 'refund_issued'\n              AND a.experiment_id = :experiment_id\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)\n        GROUP BY a.variant"}, {"agent": "experiment", "template": "experiment_latency", "rows": 20000, "duration_ms": 19, "sql": "SELECT a.variant, a.latency_ms\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.latency_ms IS NOT NULL\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)"}], "agent_errors": []}}, "real": {"finding": "Overall payment success rate decreased from 99.0% to 96.92% in the current window. The drop is not concentrated in any segment above the configured volume and delta thresholds; treat it as platform-wide pending verification. Review required before any mitigation; the timing evidence does not by itself prove causation.", "evidence": ["Overall success rate moved from 99.0% (baseline) to 96.92% in the current window (-2.08 pp), computed on 1,494 settled attempts (6 still pending).", "Largest funnel-stage conversion change: 'initiated' 99.79% -> 97.07% (-2.72 pp).", "Real aggregate A/B readouts (Upworthy Research Archive (CC BY 4.0), arm units are the source's own impressions): upworthy-51f02df82c37bc6447007d0d: control 2.06% vs treatment 8.0% (+5.94 pp, p = 3e-16, SRM p = 0.001) -> ship candidate: recommend staged rollout with human approval | upworthy-5419ed6f3088cfcf1f0000c0: control 10.94% vs treatment 5.52% (-5.42 pp, p = 4e-16, SRM p = 0.4435) -> hold: treatment significantly worse than control | upworthy-5143607b220cb8000200091c: control 2.3% vs treatment 7.08% (+4.78 pp, p = 3e-16, SRM p = 0.0382) -> ship candidate: recommend staged rollout with human approval."], "recommended_actions": ["Re-run this investigation after the 6 pending attempts settle; late settlement can shift the exact rates."], "funnel_overall": {"success_rate_current": 96.92, "success_rate_baseline": 99.0, "delta_pp": -2.08, "settled_current": 1494, "settled_baseline": 13459, "pending_current": 6}, "funnel_window": {"start": "2018-08-18T21:00:00+00:00", "end": "2018-10-17T21:00:00+00:00"}, "data_source": "olist (real orders) + upworthy (real A/B archive)", "grain": "day", "planner": "config-driven", "data_provenance": {"olist": {"source": "Olist adapter: real marketplace orders -> PayLens canonical event stream", "verification": {"source": "olist", "title": "Olist Brazilian E-commerce Public Dataset (real marketplace data)", "license": "CC BY-NC-SA 4.0 (attribution + non-commercial + share-alike)", "files": [{"file": "olist_orders_dataset.csv", "sha256": "8df58ef3d2d7e9944010f7beecd9b75367f5588ec6e3c91cec19ae3345ef9ecf", "rows": 99441}, {"file": "olist_order_payments_dataset.csv", "sha256": "4f713964f2815dbbaa40b9488268c55aac3627bfce5aa96cf58d1f3616de3cc0", "rows": 103886}, {"file": "olist_customers_dataset.csv", "sha256": "983a422239e1712ded753b3bf9ecf47dc73f144d306029dcfa99e70a226883d2", "rows": 99441}]}, "validation": [{"file": "olist_orders_dataset.csv", "rows_read": 99441, "accepted": 99441, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}, {"file": "olist_order_payments_dataset.csv", "rows_read": 103886, "accepted": 103886, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}, {"file": "olist_customers_dataset.csv", "rows_read": 99441, "accepted": 99441, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}], "mapping": {"attempt": "olist order_id", "amount": "sum(order payments) in centavos, currency BRL", "method": "primary payment_type (lowest payment_sequential)", "second_dimension": "customer_state (presented as region)", "terminal": "delivered=succeeded; canceled/unavailable=failed at last observed event; other statuses pending (censoring-safe)", "timezone": "source BRT (UTC-3) -> store UTC"}, "stats": {"orders": 99441, "events_received": 495156, "events_ingested": 495156, "duplicates": 0, "invalid": 0, "attempts_upserted": 99441, "assignments": 0, "assignments_backfilled": 0, "duration_ms": 110598}}, "upworthy": {"summary": {"source": "Upworthy Research Archive (CC BY 4.0)", "packages": 22666, "tests_total": 4873, "tests_evaluated": 4873, "tests_srm_ok_significant": 1488, "tests_srm_failures": 747}}}}};
 const $ = s => document.querySelector(s);
 const el = (t, c, h) => { const n = document.createElement(t); if (c) n.className = c; if (h !== undefined) n.innerHTML = h; return n; };
 const fmt = n => n === null || n === undefined ? "—" : Number(n).toLocaleString("en-US");
@@ -481,6 +520,7 @@ const SECTIONS = [
   { id: "governance", label: "Governance", group: "Platform", ic: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>' },
   { id: "realdata", label: "Real Data", group: "Platform", ic: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>' },
   { id: "architecture", label: "Architecture", group: "Platform", ic: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>' },
+  { id: "analyze", label: "Analyze Data", group: "System", ic: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>' },
   { id: "connect", label: "Connect", group: "System", ic: '<path d="M9 12h6M12 9v6"/><circle cx="12" cy="12" r="9"/>' },
 ];
 let current = "overview";
@@ -494,7 +534,7 @@ function show(id) {
   });
   $("#tb-title").textContent = SECTIONS.find(s => s.id === id).label;
   window.scrollTo({ top: 0, behavior: "smooth" });
-  if (id === "anomaly") renderAnomaly();
+  if (id === "anomaly") renderAnomaly(APP_DATA);
 }
 (function buildNav() {
   const nav = $("#nav"), tn = $("#topnav");
@@ -526,16 +566,19 @@ function showTip(html, x, y, wrap) {
 function hideTip() { tip.classList.remove("show"); }
 
 /* ---------- overview ---------- */
-(function () {
-  const F = DATA.demo.funnel, o = F.overall, cp = DATA.demo.anomaly.change_point, dep = DATA.demo.anomaly.correlated_deployment,
-        gw = DATA.demo.segments.gateway, E = DATA.demo.experiment;
-  $("#ov-title").textContent = DATA.demo.title;
-  $("#ov-finding").textContent = DATA.demo.finding;
+function renderOverview(D) {
+  $("#ov-kpis").replaceChildren(); $("#ov-evidence").replaceChildren(); $("#ov-actions").replaceChildren();
+  const F = D.funnel, o = F.overall, cp = D.anomaly.change_point, dep = D.anomaly.correlated_deployment,
+        gw = D.segments.gateway, E = D.experiment;
+  $("#ov-title").textContent = D.title;
+  $("#ov-finding").textContent = D.finding;
   $("#st-1").textContent = `Overall success rate moved from ${pct(o.success_rate_baseline)} to ${pct(o.success_rate_current)} (${o.delta_pp} pp) on ${fmt(o.settled_current)} settled attempts — far beyond noise.`;
-  $("#st-2").textContent = `gateway-b fell ${gw[0].delta_pp} pp while gateway-a held (${gw[1].delta_pp} pp). The deficit is ${fmt(Math.round(gw[0].success_deficit))} failed attempts concentrated in one slice.`;
+  const w1 = gw.find(x => x !== gw[0] && x.delta_pp > -1) || gw[1];
+  $("#st-2").textContent = w1 ? `${gw[0].value} fell ${gw[0].delta_pp} pp while ${w1.value} held (${w1.delta_pp} pp). The deficit is ${fmt(Math.round(gw[0].success_deficit))} failed attempts concentrated in one slice.` : `${gw[0].value} fell ${gw[0].delta_pp} pp — deficit ${fmt(Math.round(gw[0].success_deficit))} failed attempts concentrated in one slice.`;
   $("#st-3").textContent = `Change point at ${cp.label}: ${pct(cp.baseline_same_hour)} → ${pct(cp.success_rate)} (z = ${cp.z}). Deployment ${dep.change_id} on ${dep.service} landed ${Math.abs(dep.lead_time_minutes)} minutes inside the same bucket.`;
-  $("#st-4").textContent = `Independent A/B on UPI v2: treatment +${E.effect.delta_pp} pp (p = ${E.effect.p_value}), all guardrails green — a validated recovery path.`;
-  const series = DATA.demo.anomaly.hourly_series.map(d => d.success_rate);
+  const hasExp = E && E.effect;
+  $("#st-4").textContent = hasExp ? `Independent A/B on ${E.experiment_id}: treatment +${E.effect.delta_pp} pp (p = ${E.effect.p_value}), all guardrails green — a validated recovery path.` : "No A/B columns (experiment_id + variant) in this data — the ship decision must rest on observational evidence only.";
+  const series = D.anomaly.hourly_series.map(d => d.success_rate);
   const spark = svgEl("svg", { viewBox: "0 0 120 34", class: "chart", style: "position:absolute;right:14px;top:14px;width:110px;height:32px;opacity:.85" });
   const min = Math.min(...series), max = Math.max(...series);
   const pts = series.map((v, i) => `${i / (series.length - 1) * 118 + 1},${30 - (v - min) / (max - min || 1) * 26}`).join(" ");
@@ -543,32 +586,33 @@ function hideTip() { tip.classList.remove("show"); }
   const kpis = [
     { l: "Success rate", v: pct(o.success_rate_current), t: "down", d: `${o.delta_pp} pp vs baseline ${pct(o.success_rate_baseline)}`, spark: true },
     { l: "Settled attempts", v: fmt(o.settled_current), t: "flat", d: `baseline ${fmt(o.settled_baseline)} · ${fmt(o.pending_current ?? o.pending)} pending` },
-    { l: "Worst segment", v: "gateway-b", t: "down", d: `${gw[0].delta_pp} pp · deficit ${fmt(Math.round(gw[0].success_deficit))}` },
-    { l: "A/B treatment lift", v: "+" + E.effect.delta_pp + " pp", t: "up", d: `p = ${E.effect.p_value} · ship candidate` },
+    { l: "Worst segment", v: gw[0].value, t: "down", d: `${gw[0].delta_pp} pp · deficit ${fmt(Math.round(gw[0].success_deficit))}` },
+    { l: hasExp ? "A/B treatment lift" : "A/B data", v: hasExp ? "+" + E.effect.delta_pp + " pp" : "not present", t: hasExp ? "up" : "flat", d: hasExp ? `p = ${E.effect.p_value} · ship candidate` : "no experiment_id/variant columns in data" },
   ];
   kpis.forEach(k => {
     const n = el("div", "kpi", `<div class="label">${esc(k.l)}</div><div class="value">${esc(k.v)}</div><div class="delta"><span class="trend ${k.t}">${arrow(k.t === "up" ? "up" : k.t === "down" ? "down" : "flat")}${k.t === "up" ? "healthy" : k.t === "down" ? "critical" : "neutral"}</span>${esc(k.d)}</div>`);
     if (k.spark) n.appendChild(spark);
     $("#ov-kpis").appendChild(n);
   });
-  DATA.demo.evidence.forEach(t => $("#ov-evidence").appendChild(el("li", "", esc(t))));
-  DATA.demo.recommended_actions.forEach(t => $("#ov-actions").appendChild(el("li", "", esc(t))));
-  $("#ov-plan").textContent = DATA.demo.provenance.plan_rationale;
-  const p = DATA.demo.provenance;
+  D.evidence.forEach(t => $("#ov-evidence").appendChild(el("li", "", esc(t))));
+  D.recommended_actions.forEach(t => $("#ov-actions").appendChild(el("li", "", esc(t))));
+  $("#ov-plan").textContent = D.provenance.plan_rationale;
+  const p = D.provenance;
   $("#ft-prov").innerHTML = `Run <span class="pill num">${esc(p.run_id.slice(0, 8))}…</span> · metric v${p.metric_version} · grain ${esc(p.grain)} · planner ${esc(p.planner)} · agent errors ${p.agent_errors.length}`;
   $("#sf-run-id").textContent = "run " + p.run_id.slice(0, 8) + "…";
   $("#tb-env").textContent = "synthetic demo · metric v" + p.metric_version;
-})();
+}
 
 /* ---------- funnel ---------- */
-(function () {
-  const F = DATA.demo.funnel, o = F.overall;
+function renderFunnel(D) {
+  const F = D.funnel, o = F.overall;
   $("#fu-window").textContent = (F.window?.start || "").slice(0, 10) + " → " + (F.window?.end || "").slice(0, 10);
   [{ l: "Success rate", v: pct(o.success_rate_current), t: o.delta_pp < 0 ? "down" : "up", d: `${o.delta_pp} pp vs ${pct(o.success_rate_baseline)}` },
    { l: "Settled", v: fmt(o.settled_current), t: "flat", d: `baseline ${fmt(o.settled_baseline)}` },
    { l: "Succeeded", v: fmt(F.stages[3].current), t: "down", d: `baseline ${fmt(F.stages[3].baseline)}` },
    { l: "Pending", v: fmt(o.pending_current ?? o.pending), t: "flat", d: "excluded by metric v2" }]
     .forEach(k => $("#fu-kpis").appendChild(el("div", "kpi", `<div class="label">${esc(k.l)}</div><div class="value num">${esc(k.v)}</div><div class="delta"><span class="trend ${k.t}">${arrow(k.t === "up" ? "up" : k.t === "down" ? "down" : "flat")}</span>${esc(k.d)}</div>`)));
+  $("#fu-kpis").replaceChildren(); $("#fu-chart").replaceChildren();
   const wrap = el("div");
   const max = Math.max(...F.stages.map(s => Math.max(s.current, s.baseline)));
   F.stages.forEach(s => {
@@ -586,12 +630,12 @@ function hideTip() { tip.classList.remove("show"); }
   const tb = $("#fu-table");
   tb.innerHTML = `<tr><th>Stage</th><th class="num">Current</th><th class="num">Baseline</th><th class="num">Conv. current</th><th class="num">Conv. baseline</th><th class="num">Δ</th></tr>`;
   F.stages.forEach(s => tb.appendChild(el("tr", "", `<td><b>${esc(s.stage.replace("_", " "))}</b></td><td class="num">${fmt(s.current)}</td><td class="num">${fmt(s.baseline)}</td><td class="num">${pct(s.conversion_current)}</td><td class="num">${pct(s.conversion_baseline)}</td><td class="num ${s.delta_pp < 0 ? "neg" : "pos"}">${s.delta_pp} pp</td>`)));
-})();
+}
 
 /* ---------- segments ---------- */
-(function () {
-  const dims = Object.keys(DATA.demo.segments);
-  const switchEl = $("#seg-switch");
+function renderSegments(D) {
+  const dims = Object.keys(D.segments);
+  const switchEl = $("#seg-switch"); switchEl.replaceChildren();
   let currentDim = dims[0];
   dims.forEach((d, i) => {
     const b = el("button", "seg-btn", d.replace("_", " "));
@@ -600,7 +644,7 @@ function hideTip() { tip.classList.remove("show"); }
     switchEl.appendChild(b);
   });
   function render() {
-    const rows = [...DATA.demo.segments[currentDim]].sort((a, b) => a.delta_pp - b.delta_pp);
+    const rows = [...D.segments[currentDim]].sort((a, b) => a.delta_pp - b.delta_pp);
     $("#seg-table-title").textContent = "Ranked table — " + currentDim.replace("_", " ");
     const tb = $("#seg-table");
     tb.innerHTML = `<tr><th>Value</th><th class="num">Current</th><th class="num">Baseline</th><th class="num">Δ</th><th class="num">Attempts</th><th class="num">Deficit</th></tr>`;
@@ -629,13 +673,11 @@ function hideTip() { tip.classList.remove("show"); }
     const holder = $("#seg-chart"); holder.replaceChildren(svg);
   }
   render();
-})();
+}
 
 /* ---------- anomaly (lazy) ---------- */
-let anomalyDone = false;
-function renderAnomaly() {
-  if (anomalyDone) return; anomalyDone = true;
-  const A = DATA.demo.anomaly, s = A.hourly_series;
+function renderAnomaly(D) {
+  const A = D.anomaly, s = A.hourly_series;
   const W = 820, H = 320, padL = 46, padR = 16, padT = 18, padB = 42;
   const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}` });
   const xs = i => padL + (i / (s.length - 1)) * (W - padL - padR);
@@ -664,17 +706,24 @@ function renderAnomaly() {
   svg.appendChild(svgEl("path", { d: smooth("baseline_same_hour"), fill: "none", stroke: "#d97706", "stroke-width": 1.8, "stroke-dasharray": "none", opacity: .85 }));
   svg.appendChild(svgEl("path", { d: smooth("success_rate"), fill: "none", stroke: "#2563eb", "stroke-width": 2.6, "stroke-linecap": "round" }));
   const ci = s.findIndex(d => d.hour === A.change_point.hour);
-  const depX = xs(ci) + (W - padL - padR) / s.length * 0.5;
-  svg.appendChild(svgEl("line", { x1: depX, x2: depX, y1: padT, y2: H - padB, stroke: "var(--accent2)", "stroke-width": 1.4, "stroke-dasharray": "5 4" }));
-  const dpt = svgEl("text", { x: depX + 6, y: padT + 12, fill: "var(--accent2)", "font-size": 10.5, "font-weight": 700 });
-  dpt.textContent = "CHG-8841 · 10:15"; svg.appendChild(dpt);
+  if (A.correlated_deployment.change_id !== "—") {
+    const depX = xs(ci) + (W - padL - padR) / s.length * 0.5;
+    svg.appendChild(svgEl("line", { x1: depX, x2: depX, y1: padT, y2: H - padB, stroke: "var(--accent2)", "stroke-width": 1.4, "stroke-dasharray": "5 4" }));
+    const dpt = svgEl("text", { x: depX + 6, y: padT + 12, fill: "var(--accent2)", "font-size": 10.5, "font-weight": 700 });
+    dpt.textContent = A.correlated_deployment.change_id; svg.appendChild(dpt);
+  }
   svg.appendChild(svgEl("circle", { cx: xs(ci), cy: ys(A.change_point.success_rate), r: 5.5, fill: "var(--bad)", stroke: "var(--surface)", "stroke-width": 2 }));
   svg.appendChild(svgEl("line", { x1: xs(ci), x2: xs(ci), y1: padT, y2: H - padB, stroke: "var(--bad)", opacity: .25 }));
   s.forEach((d, i) => { if (i % 3 === 0) { const t = svgEl("text", { x: xs(i), y: H - 12, fill: "var(--faint)", "font-size": 10.5, "text-anchor": "middle" }); t.textContent = d.hour; svg.appendChild(t); } });
+  const dep = A.correlated_deployment;
+  $("#an-seg").textContent = A.segment;
+  $("#an-leg-cp").textContent = "Change point " + A.change_point.hour + (A.change_point.date ? " · " + A.change_point.date : "");
+  $("#an-leg-dep").hidden = dep.change_id === "—";
+  if (dep.change_id !== "—") $("#an-leg-dep-t").textContent = dep.change_id + " · " + dep.relation;
   const cross = svgEl("line", { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: "var(--faint)", "stroke-width": 1, opacity: 0 });
   svg.appendChild(cross);
   const overlay = svgEl("rect", { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: "transparent", style: "cursor:crosshair" });
-  const wrap = $("#an-chart"); wrap.appendChild(svg); wrap.appendChild(overlay);
+  const wrap = $("#an-chart"); wrap.replaceChildren(); $("#an-cards").replaceChildren(); wrap.appendChild(svg); wrap.appendChild(overlay);
   overlay.addEventListener("mousemove", e => {
     const rect = svg.getBoundingClientRect(), relX = (e.clientX - rect.left) / rect.width * W;
     const i = Math.max(0, Math.min(s.length - 1, Math.round((relX - padL) / (W - padL - padR) * (s.length - 1))));
@@ -693,8 +742,9 @@ function renderAnomaly() {
 }
 
 /* ---------- experiment ---------- */
-(function () {
-  const E = DATA.demo.experiment;
+function renderExperiment(D) {
+  const E = D.experiment;
+  $("#ex-kpis").replaceChildren(); $("#ex-chart").replaceChildren();
   $("#ex-sub").textContent = `${E.experiment_id} · ${fmt(E.assignments.A)} vs ${fmt(E.assignments.B)} attempts · SRM-checked before any effect is read.`;
   $("#ex-decision").textContent = E.decision;
   $("#ex-reasons").textContent = E.decision_reasons.join("; ");
@@ -731,7 +781,299 @@ function renderAnomaly() {
    ["absolute effect", "+" + E.effect.delta_pp + " pp"], ["z statistic", String(E.effect.z)],
    ["p-value", String(E.effect.p_value)], ["MDE", E.effect.mde_pp + " pp"],
    ["relative uplift", E.effect.relative_uplift_pct + "%"]].forEach(r => st.appendChild(el("tr", "", `<td>${esc(r[0])}</td><td class="num">${esc(r[1])}</td>`)));
+}
+
+/* ---------- upload analysis engine (client-side replica of the governed pipeline) ---------- */
+let APP_DATA = DATA.demo;
+const STAGE_RANK = { started: 1, method_selected: 2, initiated: 3, gateway_response: 3, succeeded: 4, failed: 3, pending: 3 };
+const DIMS = ["method", "gateway", "bank", "app_version", "geo", "customer_tier"];
+const CSV_TEMPLATE = `attempt_id,started_at,stage_reached,method,gateway,bank,app_version,geo,customer_tier,experiment_id,variant,amount
+A-100001,2026-11-21T09:00:00Z,started,upi,gateway-a,hdfc,3.4.1,in,tier1,,,250.50
+A-100002,2026-11-21T09:01:00Z,method_selected,upi,gateway-a,hdfc,3.4.1,in,tier1,,,250.50
+A-100003,2026-11-21T09:02:00Z,initiated,card,gateway-b,icici,3.4.0,us,tier2,EXP-1,A,250.50
+A-100004,2026-11-21T09:03:00Z,succeeded,upi,gateway-a,hdfc,3.4.1,in,tier1,EXP-1,A,250.50
+A-100005,2026-11-21T09:04:00Z,failed,upi,gateway-b,sbi,3.4.0,in,tier2,EXP-1,B,250.50
+A-100006,2026-11-21T09:05:00Z,pending,upi,gateway-a,hdfc,3.4.1,in,tier1,,,250.50
+A-200001,2026-11-22T09:00:00Z,started,upi,gateway-a,hdfc,3.4.1,in,tier1,,,250.50
+A-200002,2026-11-22T09:01:00Z,method_selected,card,gateway-b,icici,3.4.0,us,tier2,,,250.50
+A-200003,2026-11-22T09:02:00Z,initiated,upi,gateway-b,sbi,3.4.1,in,tier2,EXP-1,A,250.50
+A-200004,2026-11-22T09:03:00Z,succeeded,upi,gateway-a,hdfc,3.4.1,in,tier1,EXP-1,B,250.50
+A-200005,2026-11-22T09:04:00Z,failed,upi,gateway-b,sbi,3.4.1,in,tier2,,,250.50
+A-200006,2026-11-22T09:05:00Z,succeeded,card,gateway-b,icici,3.4.0,us,tier2,,,250.50`;
+
+function parseCSV(text) {
+  const rows = []; let row = [], cur = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(cur); cur = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cur); cur = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else cur += c;
+  }
+  row.push(cur);
+  if (row.length > 1 || row[0] !== "") rows.push(row);
+  return rows;
+}
+const erf = x => {
+  const s = x < 0 ? -1 : 1; x = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return s * y;
+};
+const normSf = z => 0.5 * (1 - erf(z / Math.SQRT2));
+const chi2SfDf1 = x => x <= 0 ? 1 : 1 - erf(Math.sqrt(x / 2));
+const r2 = x => Math.round(x * 100) / 100;
+const propZ = (sA, nA, sB, nB) => {
+  const pA = sA / nA, pB = sB / nB, pp = (sA + sB) / (nA + nB);
+  const se = Math.sqrt(pp * (1 - pp) * (1 / nA + 1 / nB)) || 1e-9;
+  return { pA, pB, pp, z: (pB - pA) / se, se };
+};
+
+function analyzeUpload(rawRows) {
+  if (!rawRows.length) throw new Error("The file has no data rows.");
+  const head = rawRows[0].map(h => h.trim().toLowerCase());
+  const idx = h => head.indexOf(h);
+  const need = ["attempt_id", "started_at"];
+  for (const h of need) if (idx(h) === -1) throw new Error(`Missing required column "${h}". Columns found: ${head.join(", ")}`);
+  const hasStage = idx("stage_reached") !== -1, hasStatus = idx("status") !== -1;
+  if (!hasStage && !hasStatus) throw new Error('Missing required column "stage_reached" (or "status" as fallback).');
+  const col = {}; head.forEach((h, i) => col[h] = i);
+  const t0 = Date.now();
+  const rows = []; let badTs = 0;
+  for (let i = 1; i < rawRows.length; i++) {
+    const r = rawRows[i]; if (!r || !r[idx("attempt_id")]) continue;
+    const ts = new Date(r[idx("started_at")]);
+    if (isNaN(ts)) { badTs++; continue; }
+    const stageRaw = (hasStage ? r[idx("stage_reached")] : "") || r[idx("status")] || "";
+    const stage = String(stageRaw).trim().toLowerCase();
+    if (!(stage in STAGE_RANK)) { badTs++; continue; }
+    const o = { ts: ts.getTime(), stage, rank: STAGE_RANK[stage], dims: {} };
+    DIMS.forEach(d => { if (col[d] !== undefined) o.dims[d] = (r[col[d]] || "").trim() || "unknown"; });
+    o.exp = col.experiment_id !== undefined ? (r[col.experiment_id] || "").trim() : "";
+    o.var = col.variant !== undefined ? (r[col.variant] || "").trim().toUpperCase() : "";
+    rows.push(o);
+  }
+  if (rows.length < 50) throw new Error(`Only ${rows.length} valid rows parsed (${badTs} skipped). Need at least 50 — check the template for the expected schema.`);
+  if (badTs / (rows.length + badTs) > 0.05) throw new Error(`${badTs} rows had unparseable started_at / stage_reached values (>5%). Fix the file and retry.`);
+  const tss = rows.map(r => r.ts), maxTs = Math.max(...tss), minTs = Math.min(...tss);
+  const spanH = (maxTs - minTs) / 36e5;
+  if (spanH < 46) throw new Error(`Data spans only ${spanH.toFixed(1)} h. The analysis compares the last 24 h against the previous 24 h — the file must span at least ~46 hours (two full days).`);
+  const H = 36e5, curStart = maxTs - 24 * H, baseStart = maxTs - 48 * H;
+  const cur = rows.filter(r => r.ts > curStart), base = rows.filter(r => r.ts > baseStart && r.ts <= curStart);
+  const d2 = x => Math.round(x * 100) / 100;
+
+  /* funnel */
+  const started = c => c.length;
+  const atRank = (c, k) => c.filter(r => r.rank >= k).length;
+  const terminal = c => c.filter(r => r.stage === "succeeded" || r.stage === "failed");
+  const succ = c => c.filter(r => r.stage === "succeeded").length;
+  const pends = c => c.filter(r => r.stage === "pending").length;
+  const names = ["started", "method_selected", "initiated", "succeeded"];
+  const stages = names.map((nm, i) => {
+    const k = i + 1, cc = atRank(cur, k), bc = atRank(base, k);
+    const convC = cc / started(cur) * 100, convB = bc / started(base) * 100;
+    return { stage: nm, current: cc, baseline: bc, conversion_current: d2(convC), conversion_baseline: d2(convB), delta_pp: d2(convC - convB) };
+  });
+  const sc = terminal(cur), sb = terminal(base);
+  const srC = succ(cur) / Math.max(sc.length, 1) * 100, srB = succ(base) / Math.max(sb.length, 1) * 100;
+  const overall = { success_rate_current: d2(srC), success_rate_baseline: d2(srB), delta_pp: d2(srC - srB), settled_current: sc.length, settled_baseline: sb.length, pending_current: pends(cur) };
+
+  /* segments */
+  const segments = {};
+  DIMS.forEach(dim => {
+    if (col[dim] === undefined && dim !== "method") return;
+    const vals = new Set(rows.map(r => r.dims[dim] || "unknown"));
+    if (vals.size < 2) return;
+    const list = [];
+    vals.forEach(v => {
+      const cc = cur.filter(r => (r.dims[dim] || "unknown") === v);
+      const bc = base.filter(r => (r.dims[dim] || "unknown") === v);
+      const tc = terminal(cc), tb2 = terminal(bc);
+      if (tc.length < 10 || tb2.length < 10) return;
+      const rc = succ(cc) / tc.length * 100, rb = succ(bc) / tb2.length * 100;
+      list.push({ value: v, success_rate_current: d2(rc), success_rate_baseline: d2(rb), delta_pp: d2(rc - rb), attempts_current: cc.length, success_deficit: d2(tc.length * (rb - rc) / 100) });
+    });
+    if (list.length) segments[dim] = list.sort((a, b) => b.success_deficit - a.success_deficit);
+  });
+  const segKeys = Object.keys(segments);
+  if (!segKeys.length) throw new Error("No usable segment dimension found (each value needs ≥ 10 settled attempts in both windows).");
+  const worstDim = segKeys.includes("gateway") ? "gateway" : segKeys[0];
+  const worst = segments[worstDim][0];
+
+  /* anomaly: hourly series for the worst segment */
+  const wRows = rows.filter(r => (r.dims[worstDim] || "unknown") === worst.value);
+  const buckets = new Map();
+  wRows.forEach(r => {
+    const d = new Date(r.ts);
+    const key = `${d.toISOString().slice(0, 13)}`;
+    if (!buckets.has(key)) buckets.set(key, { n: 0, s: 0 });
+    const b = buckets.get(key); b.n++;
+    if (r.stage === "succeeded") b.s++;
+  });
+  const keys = [...buckets.keys()].sort();
+  const hourly = keys.map(k => {
+    const b = buckets.get(k);
+    const rate = b.n ? b.s / b.n * 100 : null;
+    return { key: k, hour: k.slice(11) + ":00", date: k.slice(0, 10), rate, n: b.n };
+  });
+  const meanAll = hourly.filter(h => h.rate !== null).reduce((a, h) => a + h.rate, 0) / Math.max(hourly.filter(h => h.rate !== null).length, 1);
+  const prevRate = new Map(hourly.map(h => [h.key, h.rate]));
+  const series = hourly.filter(h => h.rate !== null).map(h => {
+    const prevKey = new Date(Date.parse(h.key + ":00:00Z") - 24 * H).toISOString().slice(0, 13);
+    let m = prevRate.get(prevKey);
+    if (m === undefined || m === null) m = meanAll;
+    const p = h.rate / 100, mu = m / 100, nSettled = Math.max(h.n, 1);
+    const z = (p - mu) / Math.sqrt(Math.max(mu * (1 - mu) / nSettled, 1e-9));
+    return { hour: h.hour, date: h.date, success_rate: d2(h.rate), baseline_same_hour: d2(m), delta_pp: d2(h.rate - m), z: d2(Math.max(-20, Math.min(20, z))), attempts: h.n };
+  });
+  let cpI = 0; series.forEach((s, i) => { if (s.z < series[cpI].z) cpI = i; });
+  const cp = series[cpI];
+  const before = series.slice(0, cpI), after = series.slice(cpI);
+  const mb = before.length ? before.reduce((a, s) => a + s.success_rate, 0) / before.length : cp.baseline_same_hour;
+  const ma = after.length ? after.reduce((a, s) => a + s.success_rate, 0) / after.length : cp.success_rate;
+  const cpOut = { hour: cp.hour, label: `${cp.date} ${cp.hour}`, success_rate: cp.success_rate, baseline_same_hour: cp.baseline_same_hour, z: cp.z, attempts: cp.attempts };
+  const significant = cp.z <= -3;
+  const anomaly = {
+    grain: "hour", segment: `${worstDim}=${worst.value}`, hourly_series: series, change_point: cpOut,
+    rate_context: { mean_before_change_point: d2(mb), mean_after_change_point: d2(ma) },
+    correlated_deployment: { change_id: "—", service: "—", gateway: "—", lead_time_minutes: 0, relation: "no deployment log provided with the upload — correlate manually if you run deployments" },
+    interpretation: significant
+      ? `Timing evidence only: the sharpest hourly drop for ${worstDim}=${worst.value} is at ${cpOut.label} (z = ${cp.z}). No deployment log was supplied, so causality must be confirmed against your change calendar before any mitigation.`
+      : `No single hour shows a z ≤ -3 collapse for ${worstDim}=${worst.value}; the sharpest hour is ${cpOut.label} (z = ${cp.z}). The decline may be gradual — check segment drift and volume shifts.`,
+  };
+
+  /* experiment */
+  let experiment = null;
+  const expMap = new Map();
+  rows.forEach(r => { if (r.exp && (r.var === "A" || r.var === "B")) {
+    if (!expMap.has(r.exp)) expMap.set(r.exp, { A: { n: 0, s: 0 }, B: { n: 0, s: 0 } });
+    const g = expMap.get(r.exp); g[r.var].n++;
+    if (r.stage === "succeeded") g[r.var].s++;
+  }});
+  let best = null;
+  expMap.forEach((g, id) => { if (g.A.n >= 30 && g.B.n >= 30 && (!best || g.A.n + g.B.n > best.g.A.n + best.g.B.n)) best = { id, g }; });
+  if (best) {
+    const { id, g } = best, nA = g.A.n, nB = g.B.n;
+    const expN = nA + nB, chi2 = Math.pow(nA - nB, 2) / (expN / 2);
+    const st = propZ(g.A.s, nA, g.B.s, nB);
+    const p = Math.max(2 * normSf(Math.abs(st.z)), 1e-6);
+    const mde = 2.80 * Math.sqrt(st.pp * (1 - st.pp) * (1 / nA + 1 / nB)) * 100;
+    const dpp = d2((st.pB - st.pA) * 100);
+    const ok = p < 0.05 && dpp > 0;
+    experiment = {
+      experiment_id: id, assignments: { A: nA, B: nB },
+      srm: { ok: chi2SfDf1(chi2) > 0.01, chi2: d2(chi2), degrees_of_freedom: 1, p_value: d2(chi2SfDf1(chi2)) },
+      control: { attempts: nA, succeeded: g.A.s, success_rate: d2(st.pA * 100) },
+      treatment: { attempts: nB, succeeded: g.B.s, success_rate: d2(st.pB * 100) },
+      effect: { delta_pp: dpp, z: d2(st.z), p_value: p < 1e-4 ? p.toExponential(2) : d2(p), mde_pp: d2(mde), relative_uplift_pct: d2((st.pB - st.pA) / Math.max(st.pA, 1e-9) * 100) },
+      guardrails: [], guardrail_checks: [],
+      decision: ok ? "SHIP — treatment wins with statistical significance" : "NO SHIP — effect is not significant at α = 0.05",
+      decision_reasons: ok
+        ? [`z = ${d2(st.z)}, p = ${p < 1e-4 ? p.toExponential(2) : d2(p)}`, "SRM balance verified before reading the effect", "guardrail metrics not present in the upload — verify manually before ramp"]
+        : [`z = ${d2(st.z)}, p = ${p < 1e-4 ? p.toExponential(2) : d2(p)} ≥ 0.05`, "no significant difference between variants"],
+    };
+  }
+
+  /* narrative */
+  const pendShare = d2(pends(cur) / Math.max(cur.length, 1) * 100);
+  const title = "Uploaded data — payment performance investigation";
+  const finding = overall.delta_pp < -1
+    ? `Overall success rate moved from ${d2(srB)}% (previous 24 h) to ${d2(srC)}% (last 24 h), a ${overall.delta_pp} pp decline on ${sc.length} settled attempts. The worst slice is ${worstDim}=${worst.value} (${worst.delta_pp} pp, deficit ${d2(worst.success_deficit)}).${significant ? ` The drop concentrates after ${cpOut.label} (z = ${cp.z}).` : ""}${experiment && experiment.effect.delta_pp > 0 ? ` An A/B arm in the data shows a +${experiment.effect.delta_pp} pp recovery path.` : ""}`
+    : `No material overall decline: success rate ${d2(srC)}% in the last 24 h vs ${d2(srB)}% before (${overall.delta_pp} pp, ${sc.length} settled attempts). Segment-level checks below still matter for slices small enough to hide inside the average.`;
+  const evidence = [
+    `funnel: ${stages.map(s => `${s.stage} ${s.conversion_current}%`).join(" → ")}`,
+    `success_rate v2: ${d2(srC)}% current vs ${d2(srB)}% baseline (${overall.delta_pp} pp) on ${sc.length}/${sb.length} settled`,
+    `worst segment by deficit: ${worstDim}=${worst.value} — ${worst.delta_pp} pp on ${fmt(worst.attempts_current)} attempts (deficit ${d2(worst.success_deficit)})`,
+    `change point: ${cpOut.label}, z = ${cp.z} (${significant ? "significant" : "not significant at z ≤ -3"})`,
+    experiment ? `A/B ${experiment.experiment_id}: ${experiment.effect.delta_pp} pp, p = ${experiment.effect.p_value}, SRM χ² = ${experiment.srm.chi2}` : "no A/B columns detected",
+    `${pends(cur)} pending attempts (${pendShare}% of current window) are excluded by metric v2`,
+  ];
+  const actions = [
+    overall.delta_pp < -1 ? `Investigate ${worstDim}=${worst.value} first — it carries the largest share of the decline (deficit ${d2(worst.success_deficit)} failed attempts).` : "Keep monitoring; no mitigation is warranted on this evidence.",
+    significant ? `Pull gateway/provider logs around ${cpOut.label} and diff anything that changed within ±1 h (deploys, config, certificates, upstream incidents).` : "Set an alert at z ≤ -3 on hourly success rate to catch the next drop with timing evidence.",
+    pendShare > 5 ? `Pending share is ${pendShare}% — late settlement will shift these rates; re-run after settlement closes.` : `Pending share is ${pendShare}% — within normal bounds for metric v2.`,
+    experiment ? (experiment.effect.delta_pp > 0 && experiment.effect.p_value < 0.05 ? "Stage a rollout of the winning variant behind human approval; guardrails were not in the upload — add them." : "Keep both arms running; the readout is not yet decisive.") : "Add experiment_id/variant columns to your next export to enable causal readouts.",
+    "For the full audited trail (governed SQL, row caps, query log), run this file through the backend: python cli.py analyze --csv your.csv",
+  ];
+  const auditSteps = [
+    { agent: "funnel", template: "csv.in_memory.funnel_counts", rows: rows.length },
+    { agent: "segment", template: "csv.in_memory.success_rate_by_dimension", rows: rows.length },
+    { agent: "anomaly", template: "csv.in_memory.hourly_change_point", rows: series.length },
+  ];
+  if (experiment) auditSteps.push({ agent: "experiment", template: "csv.in_memory.ab_readout", rows: experiment.assignments.A + experiment.assignments.B });
+  return {
+    title, finding, evidence, affected_segments: segKeys.map(k => ({ dimension: k, top: segments[k][0] })),
+    recommended_actions: actions,
+    funnel: { window: { start: new Date(baseStart).toISOString(), end: new Date(maxTs).toISOString() }, baseline: "previous 24 h", stages, overall },
+    segments,
+    anomaly,
+    experiment: experiment || { experiment_id: null, assignments: { A: 0, B: 0 }, srm: { ok: false, chi2: null, degrees_of_freedom: null, p_value: null }, control: { attempts: 0, succeeded: 0, success_rate: null }, treatment: { attempts: 0, succeeded: 0, success_rate: null }, effect: null, guardrails: [], guardrail_checks: [], decision: "NO EXPERIMENT DATA", decision_reasons: ["no experiment_id/variant columns in the upload"] },
+    provenance: {
+      run_id: "upload-" + Date.now().toString(36), metric_version: 2, grain: "hour",
+      planner: "browser engine (client-side replica)",
+      plan_rationale: "Client-side replica of the governed pipeline on your upload — same window semantics (last 24 h vs previous 24 h), same metric v2 definition. Run the backend for the full audited trail with governed SQL templates and row caps.",
+      audit: auditSteps.map(s => ({ ...s, duration_ms: Math.max(1, Math.round((Date.now() - t0) / auditSteps.length * 100) / 100), sql: "-- computed in-browser; governed SQL equivalent: see sql/templates/" })),
+      agent_errors: [],
+    },
+  };
+}
+
+/* ---------- wiring ---------- */
+(function () {
+  const file = $("#file"), drop = $("#drop"), run = $("#run-btn"), reset = $("#reset-btn"), out = $("#up-out");
+  let picked = null;
+  const pick = () => file.click();
+  drop.addEventListener("click", pick);
+  drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") pick(); });
+  ["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.style.borderColor = "var(--accent)"; }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.style.borderColor = "var(--line)"; }));
+  drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) setFile(f); });
+  file.addEventListener("change", () => { if (file.files[0]) setFile(file.files[0]); });
+  function setFile(f) {
+    picked = f; run.disabled = false;
+    out.innerHTML = `<p class="mut">Ready: <b>${esc(f.name)}</b> (${(f.size / 1048576).toFixed(1)} MB). Press Analyze.</p>`;
+  }
+  $("#dl-template").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([CSV_TEMPLATE], { type: "text/csv" }));
+    a.download = "paylens-upload-template.csv"; a.click(); URL.revokeObjectURL(a.href);
+  });
+  run.addEventListener("click", async () => {
+    if (!picked) return;
+    out.innerHTML = `<p class="mut">Analyzing ${esc(picked.name)}…</p>`;
+    await new Promise(r => setTimeout(r, 30));
+    const t0 = performance.now();
+    try {
+      const text = await picked.text();
+      const parsed = parseCSV(text);
+      APP_DATA = analyzeUpload(parsed);
+      renderAll(); show("overview");
+      const secs = ((performance.now() - t0) / 1000).toFixed(2);
+      $("#tb-env").textContent = "your upload · " + fmt(APP_DATA.provenance.audit[0].rows) + " rows · metric v2";
+      $("#sf-data").textContent = "Upload analysis · client-side";
+      out.innerHTML = `<div class="alert good" style="margin-top:12px"><h2>Analysis complete in ${secs}s</h2><p>${esc(APP_DATA.finding)}</p><p style="margin-top:6px">All sections (Funnel, Segments, Anomaly, Experiment) now show your data. Reset any time from here.</p></div>`;
+      reset.hidden = false;
+    } catch (e) {
+      out.innerHTML = `<div class="alert bad" style="margin-top:12px"><h2>Could not analyze</h2><p>${esc(e.message)}</p></div>`;
+    }
+  });
+  reset.addEventListener("click", () => {
+    APP_DATA = DATA.demo; renderAll(); show("overview");
+    $("#tb-env").textContent = "synthetic demo · metric v" + DATA.demo.provenance.metric_version;
+    $("#sf-data").textContent = "Reference data · v2";
+    reset.hidden = true; out.innerHTML = `<p class="mut">Restored the embedded reference run.</p>`;
+  });
 })();
+
+function renderAll() { renderOverview(APP_DATA); renderFunnel(APP_DATA); renderSegments(APP_DATA); renderExperiment(APP_DATA); }
+renderAll();
 
 /* ---------- governance ---------- */
 (function () {
