@@ -1,7 +1,19 @@
+# Python
 __pycache__/
-*.py[cod]
+*.pyc
 .pytest_cache/
 .ruff_cache/
-*.sqlite
+*.egg-info/
+
+# Local state
 *.db
+paylens_demo_report.json
 .env
+
+# Environments
+.venv/
+venv/
+
+# Build artefacts
+dist/
+build/

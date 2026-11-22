@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PayLens — Payments Analytics &amp; Experimentation Console</title>
+<meta name="description" content="PayLens: governed payments analytics, funnel/segment/anomaly diagnosis and A/B readouts.">
+<style>
+:root{
+  --bg:#0b1220; --bg2:#0e1628; --card:#121a2e; --card2:#0f172a;
+  --line:#1e2a44; --text:#e6edf7; --muted:#8ea0bf; --accent:#4f8ef7;
+  --accent2:#7c5cff; --good:#2ecc71; --bad:#ef5350; --warn:#f0b429;
+  --radius:14px; --maxw:1180px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
+  color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;
+  font-size:clamp(14px,1.6vw,16px);line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(12px,3vw,28px)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+header{padding:clamp(18px,4vw,34px) 0 6px}
+.brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.logo svg{width:22px;height:22px}
+h1{font-size:clamp(1.35rem,4.5vw,1.9rem);margin:0;letter-spacing:-.02em}
+.sub{color:var(--muted);margin:4px 0 0;font-size:clamp(.8rem,2.6vw,.95rem)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{font-size:.72rem;font-weight:600;letter-spacing:.03em;padding:4px 10px;border-radius:999px;
+  border:1px solid var(--line);color:var(--muted);background:rgba(255,255,255,.02)}
+.chip.ok{color:var(--good);border-color:rgba(46,204,113,.35)}
+.chip.bad{color:var(--bad);border-color:rgba(239,83,80,.4)}
+.chip.info{color:var(--accent)}
+nav.tabs{position:sticky;top:0;z-index:20;background:rgba(11,18,32,.92);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);margin-top:14px}
+.tabs-inner{display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs-inner::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;padding:12px 14px;font-size:.86rem;font-weight:600;color:var(--muted);
+  background:none;border:0;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+main{padding:clamp(16px,3vw,28px) 0 60px}
+section[hidden]{display:none}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:clamp(14px,2.4vw,20px)}
+.card h3{margin:0 0 10px;font-size:.95rem;letter-spacing:.01em}
+.card p{color:var(--muted)}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.kpi .label{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700}
+.kpi .value{font-size:clamp(1.5rem,5vw,2rem);font-weight:700;margin-top:6px;letter-spacing:-.02em}
+.kpi .delta{font-size:.85rem;margin-top:4px}
+.kpi .delta.down{color:var(--bad)} .kpi .delta.up{color:var(--good)} .kpi .delta.flat{color:var(--muted)}
+.banner{border-radius:var(--radius);padding:clamp(14px,2.4vw,20px);border:1px solid rgba(239,83,80,.45);
+  background:linear-gradient(180deg,rgba(239,83,80,.10),rgba(239,83,80,.03))}
+.banner.ship{border-color:rgba(46,204,113,.45);background:linear-gradient(180deg,rgba(46,204,113,.10),rgba(46,204,113,.03))}
+.banner h2{margin:0 0 8px;font-size:clamp(1rem,3vw,1.15rem)}
+.banner p{margin:0;color:var(--text)}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius)}
+th{text-align:left;padding:10px 12px;color:var(--muted);font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.07em;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;text-align:right}
+th.num{text-align:right}
+.pos{color:var(--good);font-weight:600}.neg{color:var(--bad);font-weight:600}
+.mut{color:var(--muted)}
+ol,ul{margin:8px 0;padding-left:22px;color:var(--muted)}
+li{margin:6px 0}
+.bar-track{background:var(--card2);border-radius:6px;height:10px;position:relative;overflow:hidden;min-width:90px}
+.bar-fill{position:absolute;inset:0 auto 0 0;border-radius:6px}
+.seg-switch{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.seg-btn{padding:6px 12px;font-size:.8rem;font-weight:600;border-radius:999px;border:1px solid var(--line);
+  background:var(--card2);color:var(--muted);cursor:pointer}
+.seg-btn[aria-pressed="true"]{color:var(--text);border-color:var(--accent);background:rgba(79,142,247,.12)}
+svg.chart{width:100%;height:auto;display:block}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:.8rem}
+.legend .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+details{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:8px 0;background:var(--card2)}
+details summary{cursor:pointer;font-size:.85rem;font-weight:600;color:var(--accent)}
+details pre{overflow-x:auto;font-size:.72rem;line-height:1.5;color:#9fb3d9;background:#0a1120;
+  padding:10px;border-radius:8px;margin:8px 0 0}
+.connect-row{display:flex;gap:8px;flex-wrap:wrap}
+.connect-row input{flex:1 1 240px;min-width:0;background:var(--card2);border:1px solid var(--line);
+  border-radius:10px;padding:10px 14px;color:var(--text);font-size:.9rem;font-family:ui-monospace,Menlo,Consolas,monospace}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;border:1px solid var(--accent);
+  background:var(--accent);color:#fff;font-weight:700;font-size:.9rem;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:hover{filter:brightness(1.1);text-decoration:none}
+#api-out{margin-top:12px}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.78rem;background:#0a1120;color:#9fb3d9;
+  padding:12px 14px;border-radius:10px;overflow-x:auto;border:1px solid var(--line)}
+.arch-svg{width:100%;height:auto}
+footer{border-top:1px solid var(--line);margin-top:20px;padding:22px 0 40px;color:var(--muted);font-size:.8rem}
+footer .wrap{display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid var(--line);font-size:.72rem}
+@media (max-width:640px){td,th{padding:8px 9px}.kpi .value{font-size:1.45rem}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M3 17l4-6 4 3 5-8 5 5"/><path d="M3 21h18"/></svg></div>
+    <div>
+      <h1>PayLens Console</h1>
+      <p class="sub">Governed payments analytics · funnel, segments, anomaly &amp; A/B readouts · v1.0.0</p>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="chip info" id="chip-data">Reference data: synthetic demo run</span>
+    <span class="chip ok">58/58 tests passing</span>
+    <span class="chip">Metric: payment_success_rate v2</span>
+    <span class="chip">Governed SQL only</span>
+    <span class="chip" id="chip-live">Live API: not connected</span>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="wrap tabs-inner" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-t="overview">Overview</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="funnel">Funnel</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="segments">Segments</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="anomaly">Anomaly</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="experiment">A/B Experiment</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="governance">Governance</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="realdata">Real Data</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="architecture">Architecture</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="connect">Connect / Deploy</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<section id="s-overview" role="tabpanel">
+  <div class="banner">
+    <h2 id="ov-title"></h2>
+    <p id="ov-finding"></p>
+  </div>
+  <div class="grid g3" style="margin-top:14px" id="ov-kpis"></div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3>Evidence</h3>
+      <ul id="ov-evidence"></ul>
+    </div>
+    <div class="card">
+      <h3>Recommended actions</h3>
+      <ol id="ov-actions"></ol>
+    </div>
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card" id="ov-cp-card">
+      <h3>Change point &amp; correlated deployment</h3>
+      <p id="ov-cp"></p>
+    </div>
+    <div class="card">
+      <h3>Investigation plan</h3>
+      <p id="ov-plan"></p>
+    </div>
+  </div>
+</section>
+
+<section id="s-funnel" role="tabpanel" hidden>
+  <div class="grid g3" id="fu-kpis"></div>
+  <div class="card" style="margin-top:14px">
+    <h3>Stage conversion — current window vs baseline</h3>
+    <div id="fu-chart"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:#4f8ef7"></span>Current window</span>
+      <span><span class="dot" style="background:#31415f"></span>Baseline (same length, previous day)</span>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Stage table</h3>
+    <div class="table-scroll"><table id="fu-table"></table></div>
+  </div>
+</section>
+
+<section id="s-segments" role="tabpanel" hidden>
+  <div class="card">
+    <h3>Success-rate decline by dimension</h3>
+    <p class="mut" style="margin-top:0">Ranked by success deficit (attempt volume × rate drop). Switch dimension:</p>
+    <div class="seg-switch" id="seg-switch" role="group" aria-label="Segment dimension"></div>
+    <div class="table-scroll"><table id="seg-table"></table></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3 id="seg-chart-title">Rate comparison</h3>
+    <div id="seg-chart"></div>
+  </div>
+</section>
+
+<section id="s-anomaly" role="tabpanel" hidden>
+  <div class="card">
+    <h3>Hourly success rate — upi via gateway-b</h3>
+    <div id="an-chart"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:#4f8ef7"></span>Current</span>
+      <span><span class="dot" style="background:#f0b429"></span>Same-hour baseline</span>
+      <span><span class="dot" style="background:#ef5350"></span>Change point 10:00</span>
+      <span><span class="dot" style="background:#7c5cff"></span>Deployment 10:15</span>
+    </div>
+  </div>
+  <div class="grid g3" style="margin-top:14px" id="an-cards"></div>
+  <div class="card" style="margin-top:14px">
+    <h3>Interpretation</h3>
+    <p id="an-interp"></p>
+  </div>
+</section>
+
+<section id="s-experiment" role="tabpanel" hidden>
+  <div class="banner ship">
+    <h2>Decision: <span id="ex-decision"></span></h2>
+    <p id="ex-reasons"></p>
+  </div>
+  <div class="grid g3" style="margin-top:14px" id="ex-kpis"></div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3>Variant success rates</h3>
+      <div id="ex-chart"></div>
+    </div>
+    <div class="card">
+      <h3>Guardrails (A vs B)</h3>
+      <div class="table-scroll"><table id="ex-guard"></table></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Statistical detail</h3>
+    <div class="table-scroll"><table id="ex-stats"></table></div>
+  </div>
+</section>
+
+<section id="s-governance" role="tabpanel" hidden>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Governance contract</h3>
+      <ul>
+        <li><b>No free-form SQL</b> — agents execute versioned, reviewed templates only.</li>
+        <li><b>Parameter binding everywhere</b> — every value is a bound parameter; identifiers come from a whitelist.</li>
+        <li><b>Row caps &amp; truncation flags</b> — queries return bounded results; truncation is explicit.</li>
+        <li><b>Full audit trail</b> — every executed query is logged with agent, template, row count and duration.</li>
+        <li><b>Versioned metrics</b> — success_rate v2 excludes unsettled attempts and reports the pending share separately.</li>
+        <li><b>Fail-closed contracts</b> — invalid events are dead-lettered, never silently coerced.</li>
+        <li><b>Human approval</b> — decisions stop short of autonomous mitigation.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Governed templates used in this run</h3>
+      <ul id="gov-templates"></ul>
+      <p class="mut" id="gov-note"></p>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Query audit log — 18 governed queries (reference run)</h3>
+    <div class="table-scroll"><table id="gov-audit"></table></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Example governed SQL (funnel_counts template)</h3>
+    <details><summary>Show template source</summary><pre id="gov-sql"></pre></details>
+  </div>
+</section>
+
+<section id="s-realdata" role="tabpanel" hidden>
+  <div class="card">
+    <h3>Finding — real data, honest null</h3>
+    <p id="rd-finding" style="color:var(--text)"></p>
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h3>Evidence</h3><ul id="rd-evidence"></ul></div>
+    <div class="card"><h3>Next steps</h3><ul id="rd-actions"></ul></div>
+  </div>
+  <div class="grid g3" style="margin-top:14px" id="rd-kpis"></div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h3>Sources</h3><p id="rd-src"></p></div>
+    <div class="card"><h3>Why this matters</h3><p>Real sources arrive with different vocabularies (Olist payment types like <i>boleto</i>, <i>not_defined</i>), their own edge cases (missing payments, approval-before-purchase clock skew, split payments, canceled orders) and fail-closed checksum verification. The governed layer accepts them without schema drift — the same templates and agents run unchanged.</p></div>
+  </div>
+</section>
+
+<section id="s-architecture" role="tabpanel" hidden>
+  <div class="card">
+    <h3>System architecture</h3>
+    <div id="arch-diagram"></div>
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3>Agent workflow (LangGraph)</h3>
+      <div id="arch-flow"></div>
+    </div>
+    <div class="card">
+      <h3>Layer map</h3>
+      <ul>
+        <li><b>Producers</b> — synthetic generator (20k attempts/day, seeded hazards) or real adapters (Olist, Upworthy).</li>
+        <li><b>Transport</b> — in-memory bus for the demo, Kafka for production; identical consumer contract.</li>
+        <li><b>Ingest</b> — dedup, reorder-safe stage derivation, delayed outcomes, dead-lettering.</li>
+        <li><b>Store</b> — SQLAlchemy 2.0 on SQLite (demo) / PostgreSQL (Docker), WAL tuned.</li>
+        <li><b>Governed SQL</b> — template-only, parameterized, row-capped, fully audited.</li>
+        <li><b>Agents</b> — LangGraph supervisor routes funnel → segments → anomaly → experiment with retry budgets.</li>
+        <li><b>Hybrid LLM</b> — advisory planning and number-pinned narration; deterministic fallback needs no API key.</li>
+        <li><b>Surfaces</b> — FastAPI + dashboard, CLI, this static console.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="s-connect" role="tabpanel" hidden>
+  <div class="card">
+    <h3>Connect to a live PayLens API</h3>
+    <p class="mut" style="margin-top:0">This console ships with the repository's reference run embedded, so it works as a pure static site on Vercel. To browse fresh data, run the backend locally (or in Docker) and point the console at it:</p>
+    <div class="code">git clone https://github.com/deepak2233/PayLens.git && cd PayLens
+pip install -r requirements.txt
+uvicorn paylens.api.main:app --port 8000          # or: python cli.py demo && python cli.py serve</div>
+    <div class="connect-row" style="margin-top:14px">
+      <input id="api-url" type="url" placeholder="http://localhost:8000" aria-label="API base URL">
+      <button class="btn" id="api-go">Connect</button>
+    </div>
+    <div id="api-out"></div>
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3>Deploy this console to Vercel</h3>
+      <p class="mut" style="margin-top:0">The repo includes <span class="pill">vercel.json</span> — zero configuration, static output from <span class="pill">web/</span>.</p>
+      <a class="btn" href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdeepak2233%2FPayLens">Deploy with Vercel</a>
+      <p class="mut" style="margin-top:12px">CLI alternative:</p>
+      <div class="code">npm i -g vercel
+vercel            # from the repo root</div>
+    </div>
+    <div class="card">
+      <h3>API surface (when running the backend)</h3>
+      <div class="table-scroll"><table>
+        <tr><th>Endpoint</th><th>Purpose</th></tr>
+        <tr><td class="code">GET /api/health</td><td>liveness, data horizon</td></tr>
+        <tr><td class="code">POST /api/investigations</td><td>run the full agent investigation</td></tr>
+        <tr><td class="code">GET /api/investigations/{id}</td><td>full report incl. provenance</td></tr>
+        <tr><td class="code">GET /api/metrics/success-rate</td><td>versioned metric, groupable</td></tr>
+        <tr><td class="code">GET /api/experiments/{id}/readout</td><td>statistical readout</td></tr>
+        <tr><td class="code">GET /api/audit/queries</td><td>governed-query audit log</td></tr>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div id="ft-prov"></div>
+    <div>PayLens v1.0.0 · static console · data embedded from the repository reference run</div>
+  </div>
+</footer>
+
+<script>
+const DATA = {"demo": {"title": "Payment Performance Investigation", "finding": "Overall payment success rate decreased from 91.24% to 79.85% in the current window. The decline is concentrated in upi transactions routed through gateway-b (-25.32 pp for that slice). A deployment on payment-gateway-adapter (CHG-8841) fell within the change-point bucket. Review required before any mitigation; the timing evidence does not by itself prove causation.", "evidence": ["Overall success rate moved from 91.24% (baseline) to 79.85% in the current window (-11.39 pp), computed on 11,241 settled attempts (577 still pending).", "Largest funnel-stage conversion change: 'succeeded' 86.89% -> 75.95% (-10.93 pp).", "Decline concentrated in: upi via gateway-b: 91.0% -> 65.68% (-25.32 pp, 5,026 attempts).", "Change point detected at 2026-11-21 10:00 for upi via gateway-b: 90.22% -> 66.22% (z = -7.25, hour grain). Deployment CHG-8841 on payment-gateway-adapter (gateway-b) within the change-point bucket (deployed 2026-11-21T10:15:00) - timing evidence, not proven causation.", "A/B readout (exp-2026-11-checkout-upi-v2): A 80.15% vs B 81.91% (+1.76 pp, p = 0.0015, SRM p = 1.0). Decision: ship candidate: recommend staged rollout with human approval."], "affected_segments": [{"method": "upi", "gateway": "gateway-b", "success_rate_current": 65.68, "success_rate_baseline": 91.0, "delta_pp": -25.32, "attempts_current": 5275, "settled_current": 5026, "pending_current": 249, "success_deficit": 1272.6}], "recommended_actions": ["Verify CHG-8841 on payment-gateway-adapter: inspect gateway-b timeout logs around the change point and the deployment diff before and after.", "Assess whether traffic can be safely rerouted away from the degraded gateway, then monitor success rate and latency for at least one full traffic cycle after mitigation.", "Proceed to a staged rollout of the treatment variant with human approval; keep guardrail monitoring active during ramp-up.", "Re-run this investigation after the 577 pending attempts settle; late settlement can shift the exact rates."], "funnel": {"window": {"start": "2026-11-21T01:00:00+00:00", "end": "2026-11-22T01:00:00+00:00"}, "baseline": {"start": "2026-11-20T01:00:00+00:00", "end": "2026-11-21T01:00:00+00:00"}, "stages": [{"stage": "started", "current": 11818, "baseline": 12041, "conversion_current": 100.0, "conversion_baseline": 100.0, "delta_pp": 0.0}, {"stage": "method_selected", "current": 11471, "baseline": 11709, "conversion_current": 97.06, "conversion_baseline": 97.24, "delta_pp": -0.18}, {"stage": "initiated", "current": 11241, "baseline": 11467, "conversion_current": 95.12, "conversion_baseline": 95.23, "delta_pp": -0.12}, {"stage": "succeeded", "current": 8976, "baseline": 10462, "conversion_current": 75.95, "conversion_baseline": 86.89, "delta_pp": -10.93}], "overall": {"success_rate_current": 79.85, "success_rate_baseline": 91.24, "delta_pp": -11.39, "settled_current": 11241, "settled_baseline": 11467, "pending_current": 577}}, "segments": {"method": [{"value": "upi", "success_rate_current": 79.85, "success_rate_baseline": 91.24, "delta_pp": -11.39, "attempts_current": 11241, "success_deficit": 1280.3}], "gateway": [{"value": "gateway-b", "success_rate_current": 65.68, "success_rate_baseline": 91.0, "delta_pp": -25.32, "attempts_current": 5026, "success_deficit": 1272.6}, {"value": "gateway-a", "success_rate_current": 91.31, "success_rate_baseline": 91.42, "delta_pp": -0.11, "attempts_current": 6215, "success_deficit": 6.8}], "bank": [{"value": "HDFC", "success_rate_current": 79.14, "success_rate_baseline": 90.49, "delta_pp": -11.35, "attempts_current": 3390, "success_deficit": 384.8}, {"value": "ICICI", "success_rate_current": 80.32, "success_rate_baseline": 92.05, "delta_pp": -11.73, "attempts_current": 2866, "success_deficit": 336.2}, {"value": "SBI", "success_rate_current": 80.26, "success_rate_baseline": 90.94, "delta_pp": -10.68, "attempts_current": 2745, "success_deficit": 293.2}, {"value": "Axis", "success_rate_current": 80.3, "success_rate_baseline": 91.92, "delta_pp": -11.62, "attempts_current": 1340, "success_deficit": 155.7}, {"value": "Kotak", "success_rate_current": 79.11, "success_rate_baseline": 91.31, "delta_pp": -12.2, "attempts_current": 900, "success_deficit": 109.8}], "app_version": [{"value": "3.2.0", "success_rate_current": 79.48, "success_rate_baseline": 91.38, "delta_pp": -11.9, "attempts_current": 9589, "success_deficit": 1141.1}, {"value": "3.1.0", "success_rate_current": 82.29, "success_rate_baseline": 90.4, "delta_pp": -8.11, "attempts_current": 1107, "success_deficit": 89.8}, {"value": "3.3.0-beta", "success_rate_current": 81.47, "success_rate_baseline": 90.4, "delta_pp": -8.93, "attempts_current": 545, "success_deficit": 48.7}], "geo": [{"value": "IN-MH", "success_rate_current": 79.74, "success_rate_baseline": 90.95, "delta_pp": -11.21, "attempts_current": 3425, "success_deficit": 383.9}, {"value": "IN-KA", "success_rate_current": 80.66, "success_rate_baseline": 91.41, "delta_pp": -10.75, "attempts_current": 2787, "success_deficit": 299.6}, {"value": "IN-DL", "success_rate_current": 79.64, "success_rate_baseline": 91.32, "delta_pp": -11.68, "attempts_current": 2269, "success_deficit": 265.0}, {"value": "IN-TN", "success_rate_current": 79.64, "success_rate_baseline": 91.13, "delta_pp": -11.49, "attempts_current": 1655, "success_deficit": 190.2}, {"value": "IN-WB", "success_rate_current": 78.91, "success_rate_baseline": 91.67, "delta_pp": -12.76, "attempts_current": 1105, "success_deficit": 141.0}], "customer_tier": [{"value": "retail", "success_rate_current": 80.21, "success_rate_baseline": 91.2, "delta_pp": -10.99, "attempts_current": 8980, "success_deficit": 986.9}, {"value": "premium", "success_rate_current": 79.02, "success_rate_baseline": 91.06, "delta_pp": -12.04, "attempts_current": 1687, "success_deficit": 203.1}, {"value": "vip", "success_rate_current": 76.66, "success_rate_baseline": 92.27, "delta_pp": -15.61, "attempts_current": 574, "success_deficit": 89.6}]}, "anomaly": {"grain": "hour", "segment": {"method": "upi", "gateway": "gateway-b"}, "hourly_series": [{"hour": "01:00", "date": "2026-11-21", "success_rate": 95.83, "baseline_same_hour": 92.86, "delta_pp": 2.98, "z": 0.67, "attempts": 48}, {"hour": "02:00", "date": "2026-11-21", "success_rate": 92.86, "baseline_same_hour": 92.31, "delta_pp": 0.55, "z": 0.09, "attempts": 42}, {"hour": "03:00", "date": "2026-11-21", "success_rate": 95.0, "baseline_same_hour": 95.83, "delta_pp": -0.83, "z": -0.19, "attempts": 40}, {"hour": "04:00", "date": "2026-11-21", "success_rate": 92.54, "baseline_same_hour": 87.93, "delta_pp": 4.61, "z": 0.87, "attempts": 67}, {"hour": "05:00", "date": "2026-11-21", "success_rate": 93.33, "baseline_same_hour": 90.2, "delta_pp": 3.14, "z": 0.78, "attempts": 90}, {"hour": "06:00", "date": "2026-11-21", "success_rate": 91.1, "baseline_same_hour": 85.71, "delta_pp": 5.38, "z": 1.38, "attempts": 146}, {"hour": "07:00", "date": "2026-11-21", "success_rate": 92.38, "baseline_same_hour": 92.48, "delta_pp": -0.1, "z": -0.04, "attempts": 210}, {"hour": "08:00", "date": "2026-11-21", "success_rate": 91.29, "baseline_same_hour": 91.67, "delta_pp": -0.38, "z": -0.16, "attempts": 287}, {"hour": "09:00", "date": "2026-11-21", "success_rate": 88.99, "baseline_same_hour": 93.63, "delta_pp": -4.64, "z": -2.08, "attempts": 327}, {"hour": "10:00", "date": "2026-11-21", "success_rate": 66.22, "baseline_same_hour": 90.22, "delta_pp": -24.0, "z": -7.25, "attempts": 296}, {"hour": "11:00", "date": "2026-11-21", "success_rate": 61.21, "baseline_same_hour": 89.0, "delta_pp": -27.79, "z": -7.79, "attempts": 281}, {"hour": "12:00", "date": "2026-11-21", "success_rate": 57.65, "baseline_same_hour": 90.85, "delta_pp": -33.19, "z": -9.27, "attempts": 307}, {"hour": "13:00", "date": "2026-11-21", "success_rate": 55.98, "baseline_same_hour": 89.72, "delta_pp": -33.73, "z": -8.89, "attempts": 259}, {"hour": "14:00", "date": "2026-11-21", "success_rate": 51.93, "baseline_same_hour": 92.57, "delta_pp": -40.64, "z": -10.61, "attempts": 285}, {"hour": "15:00", "date": "2026-11-21", "success_rate": 56.47, "baseline_same_hour": 93.99, "delta_pp": -37.52, "z": -9.58, "attempts": 278}, {"hour": "16:00", "date": "2026-11-21", "success_rate": 57.04, "baseline_same_hour": 91.92, "delta_pp": -34.89, "z": -9.17, "attempts": 270}, {"hour": "17:00", "date": "2026-11-21", "success_rate": 51.39, "baseline_same_hour": 91.56, "delta_pp": -40.17, "z": -11.27, "attempts": 323}, {"hour": "18:00", "date": "2026-11-21", "success_rate": 53.59, "baseline_same_hour": 89.71, "delta_pp": -36.12, "z": -11.08, "attempts": 390}, {"hour": "19:00", "date": "2026-11-21", "success_rate": 55.66, "baseline_same_hour": 91.35, "delta_pp": -35.7, "z": -10.56, "attempts": 327}, {"hour": "20:00", "date": "2026-11-21", "success_rate": 62.98, "baseline_same_hour": 92.7, "delta_pp": -29.72, "z": -8.43, "attempts": 289}, {"hour": "21:00", "date": "2026-11-21", "success_rate": 59.91, "baseline_same_hour": 88.18, "delta_pp": -28.27, "z": -6.59, "attempts": 222}, {"hour": "22:00", "date": "2026-11-21", "success_rate": 58.21, "baseline_same_hour": 85.71, "delta_pp": -27.51, "z": -5.31, "attempts": 134}, {"hour": "23:00", "date": "2026-11-21", "success_rate": 49.07, "baseline_same_hour": 94.96, "delta_pp": -45.88, "z": -7.79, "attempts": 108}], "change_point": {"hour": "10:00", "date": "2026-11-21", "success_rate": 66.22, "baseline_same_hour": 90.22, "delta_pp": -24.0, "z": -7.25, "attempts": 296, "label": "2026-11-21 10:00"}, "rate_context": {"mean_before_change_point": 92.59, "mean_after_change_point": 56.95}, "correlated_deployment": {"change_id": "CHG-8841", "service": "payment-gateway-adapter", "gateway": "gateway-b", "deployed_at": "2026-11-21T10:15:00", "note": "Gateway B adapter rollout v2.7.0 (connection-pool resize)", "lead_time_minutes": -15, "relation": "within the change-point bucket"}, "interpretation": "Timing evidence only: the metric change point follows the listed deployment; causality must be confirmed by engineers in gateway logs before any rerouting or rollback decision."}, "experiment": {"experiment_id": "exp-2026-11-checkout-upi-v2", "assignments": {"A": 10000, "B": 10000}, "srm": {"ok": true, "chi2": 0.0, "p_value": 1.0, "degrees_of_freedom": 1}, "control": {"variant": "A", "attempts": 10000, "succeeded": 8015, "success_rate": 80.15}, "treatment": {"variant": "B", "attempts": 10000, "succeeded": 8191, "success_rate": 81.91}, "effect": {"delta_pp": 1.76, "relative_uplift_pct": 2.2, "z": 3.174, "p_value": "0.0015", "significant": true, "mde_pp": 1.58}, "guardrails": [{"variant": "A", "latency_p50_ms": 1348.0, "latency_p95_ms": 1780.0, "timeout_rate": 0.0, "dup_charge_rate": 0.0, "refund_rate": 0.0027}, {"variant": "B", "latency_p50_ms": 1149.0, "latency_p95_ms": 1579.0, "timeout_rate": 0.0, "dup_charge_rate": 0.0002, "refund_rate": 0.0022}], "guardrail_checks": [{"name": "latency_p95_ms", "control": 1780.0, "treatment": 1579.0, "threshold": 0.1, "unit": "ms", "ok": true}, {"name": "timeout_rate", "control": 0.0, "treatment": 0.0, "threshold": 0.1, "unit": "ratio", "ok": true}, {"name": "dup_charge_rate", "control": 0.0, "treatment": 0.0002, "threshold": 0.1, "unit": "ratio", "ok": true}, {"name": "refund_rate", "control": 0.0027, "treatment": 0.0022, "threshold": 0.1, "unit": "ratio", "ok": true}], "decision": "ship candidate: recommend staged rollout with human approval", "decision_reasons": ["assignment integrity, significance and all guardrails passed"]}, "provenance": {"run_id": "f73319e2-2680-43ae-82c5-5e2182530c43", "metric_version": 2, "grain": "hour", "planner": "deterministic", "plan_rationale": "Deterministic plan: 24h window, focus method 'upi'; funnel first, then segments, anomaly and experiment checks.", "audit": [{"agent": "funnel", "template": "funnel_counts", "rows": 1, "duration_ms": 26, "sql": "SELECT\n            COUNT(*)                                                              AS started,\n            SUM(CASE WHEN method_selected_at IS NOT NULL THEN 1 ELSE 0 END)        AS method_selected,\n            SUM(CASE WHEN initiated_at      IS NOT NULL THEN 1 ELSE 0 END)        AS initiated,\n            SUM(CASE WHEN settled           THEN 1 ELSE 0 END)                    AS settled,\n            SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            SUM(CASE WHEN settled AND status <> 'succeeded' THEN 1 ELSE 0 END)     AS failed\n        FROM pay"}, {"agent": "funnel", "template": "funnel_counts", "rows": 1, "duration_ms": 24, "sql": "SELECT\n            COUNT(*)                                                              AS started,\n            SUM(CASE WHEN method_selected_at IS NOT NULL THEN 1 ELSE 0 END)        AS method_selected,\n            SUM(CASE WHEN initiated_at      IS NOT NULL THEN 1 ELSE 0 END)        AS initiated,\n            SUM(CASE WHEN settled           THEN 1 ELSE 0 END)                    AS settled,\n            SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            SUM(CASE WHEN settled AND status <> 'succeeded' THEN 1 ELSE 0 END)     AS failed\n        FROM pay"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 1, "duration_ms": 77, "sql": "SELECT method                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT method,\n                   sta"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 2, "duration_ms": 81, "sql": "SELECT gateway                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT gateway,\n                   s"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 5, "duration_ms": 78, "sql": "SELECT bank                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT bank,\n                   started"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 3, "duration_ms": 78, "sql": "SELECT app_version                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT app_version,\n            "}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 5, "duration_ms": 79, "sql": "SELECT geo                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT geo,\n                   started_a"}, {"agent": "segment", "template": "success_rate_by_dimension", "rows": 3, "duration_ms": 78, "sql": "SELECT customer_tier                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT customer_tier,\n        "}, {"agent": "segment", "template": "segment_profile", "rows": 2, "duration_ms": 27, "sql": "SELECT method, gateway,\n               SUM(CASE WHEN settled AND status='succeeded' THEN 1 ELSE 0 END) AS succeeded,\n               SUM(CASE WHEN settled THEN 1 ELSE 0 END)                        AS settled,\n               SUM(CASE WHEN settled THEN 0 ELSE 1 END)                        AS pending,\n               COUNT(*)                                                        AS attempts\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n              AND (:gateway IS NULL OR gateway = :gat"}, {"agent": "segment", "template": "segment_profile", "rows": 2, "duration_ms": 28, "sql": "SELECT method, gateway,\n               SUM(CASE WHEN settled AND status='succeeded' THEN 1 ELSE 0 END) AS succeeded,\n               SUM(CASE WHEN settled THEN 1 ELSE 0 END)                        AS settled,\n               SUM(CASE WHEN settled THEN 0 ELSE 1 END)                        AS pending,\n               COUNT(*)                                                        AS attempts\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n              AND (:gateway IS NULL OR gateway = :gat"}, {"agent": "anomaly", "template": "hourly_success_rate", "rows": 47, "duration_ms": 22, "sql": "SELECT\n            CAST(strftime('%Y-%m-%dT%H', started_at) AS TEXT)                                          AS hour_bucket,\n            SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            COUNT(*)                                                             AS settled,\n            SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0) AS success_rate\n        FROM payment_attempts\n        WHERE settled\n          AND started_at >= :window_start AND started_at < :window_end\n          AND method = :method\n          AND (:gateway I"}, {"agent": "anomaly", "template": "deployments_in_window", "rows": 3, "duration_ms": 0, "sql": "SELECT change_id, service, gateway, deployed_at, note\n        FROM deployments\n        WHERE deployed_at >= :baseline_start AND deployed_at < :window_end\n        ORDER BY deployed_at"}, {"agent": "experiment", "template": "list_experiments", "rows": 1, "duration_ms": 1, "sql": "SELECT DISTINCT experiment_id\n        FROM experiment_assignments\n        ORDER BY experiment_id\n        LIMIT 5"}, {"agent": "experiment", "template": "experiment_assignments", "rows": 2, "duration_ms": 4, "sql": "SELECT variant, COUNT(*) AS assigned\n        FROM experiment_assignments\n        WHERE experiment_id = :experiment_id\n        GROUP BY variant"}, {"agent": "experiment", "template": "experiment_outcomes", "rows": 2, "duration_ms": 13, "sql": "SELECT a.variant,\n               COUNT(*)                                                       AS attempts,\n               SUM(CASE WHEN a.status='succeeded' THEN 1 ELSE 0 END)           AS succeeded,\n               SUM(CASE WHEN a.status='succeeded' THEN 1 ELSE 0 END) * 1.0\n                   / NULLIF(COUNT(*), 0)                                       AS success_rate\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.settled\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.st"}, {"agent": "experiment", "template": "experiment_guardrails", "rows": 2, "duration_ms": 14, "sql": "SELECT\n            a.variant,\n            COUNT(*)                                                        AS attempts,\n            SUM(CASE WHEN a.error_code='GATEWAY_TIMEOUT' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0) AS timeout_rate,\n            SUM(CASE WHEN a.is_duplicate_charge THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0)          AS dup_charge_rate\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.settled\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < "}, {"agent": "experiment", "template": "experiment_refunds", "rows": 2, "duration_ms": 0, "sql": "SELECT a.variant, COUNT(e.event_id) AS refunds\n        FROM payment_events e\n        JOIN payment_attempts a ON a.attempt_id = e.attempt_id\n        WHERE e.event_type = 'refund_issued'\n              AND a.experiment_id = :experiment_id\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)\n        GROUP BY a.variant"}, {"agent": "experiment", "template": "experiment_latency", "rows": 20000, "duration_ms": 19, "sql": "SELECT a.variant, a.latency_ms\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.latency_ms IS NOT NULL\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)"}], "agent_errors": []}}, "real": {"finding": "Overall payment success rate decreased from 99.0% to 96.92% in the current window. The drop is not concentrated in any segment above the configured volume and delta thresholds; treat it as platform-wide pending verification. Review required before any mitigation; the timing evidence does not by itself prove causation.", "evidence": ["Overall success rate moved from 99.0% (baseline) to 96.92% in the current window (-2.08 pp), computed on 1,494 settled attempts (6 still pending).", "Largest funnel-stage conversion change: 'initiated' 99.79% -> 97.07% (-2.72 pp).", "Real aggregate A/B readouts (Upworthy Research Archive (CC BY 4.0), arm units are the source's own impressions): upworthy-51f02df82c37bc6447007d0d: control 2.06% vs treatment 8.0% (+5.94 pp, p = 3e-16, SRM p = 0.001) -> ship candidate: recommend staged rollout with human approval | upworthy-5419ed6f3088cfcf1f0000c0: control 10.94% vs treatment 5.52% (-5.42 pp, p = 4e-16, SRM p = 0.4435) -> hold: treatment significantly worse than control | upworthy-5143607b220cb8000200091c: control 2.3% vs treatment 7.08% (+4.78 pp, p = 3e-16, SRM p = 0.0382) -> ship candidate: recommend staged rollout with human approval."], "recommended_actions": ["Re-run this investigation after the 6 pending attempts settle; late settlement can shift the exact rates."], "funnel_overall": {"success_rate_current": 96.92, "success_rate_baseline": 99.0, "delta_pp": -2.08, "settled_current": 1494, "settled_baseline": 13459, "pending_current": 6}, "funnel_window": {"start": "2018-08-18T21:00:00+00:00", "end": "2018-10-17T21:00:00+00:00"}, "data_source": "olist (real orders) + upworthy (real A/B archive)", "grain": "day", "planner": "config-driven", "data_provenance": {"olist": {"source": "Olist adapter: real marketplace orders -> PayLens canonical event stream", "verification": {"source": "olist", "title": "Olist Brazilian E-commerce Public Dataset (real marketplace data)", "license": "CC BY-NC-SA 4.0 (attribution + non-commercial + share-alike)", "files": [{"file": "olist_orders_dataset.csv", "sha256": "8df58ef3d2d7e9944010f7beecd9b75367f5588ec6e3c91cec19ae3345ef9ecf", "rows": 99441}, {"file": "olist_order_payments_dataset.csv", "sha256": "4f713964f2815dbbaa40b9488268c55aac3627bfce5aa96cf58d1f3616de3cc0", "rows": 103886}, {"file": "olist_customers_dataset.csv", "sha256": "983a422239e1712ded753b3bf9ecf47dc73f144d306029dcfa99e70a226883d2", "rows": 99441}]}, "validation": [{"file": "olist_orders_dataset.csv", "rows_read": 99441, "accepted": 99441, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}, {"file": "olist_order_payments_dataset.csv", "rows_read": 103886, "accepted": 103886, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}, {"file": "olist_customers_dataset.csv", "rows_read": 99441, "accepted": 99441, "rejected": 0, "reject_reasons": {}, "dead_letter_sample": []}], "mapping": {"attempt": "olist order_id", "amount": "sum(order payments) in centavos, currency BRL", "method": "primary payment_type (lowest payment_sequential)", "second_dimension": "customer_state (presented as region)", "terminal": "delivered=succeeded; canceled/unavailable=failed at last observed event; other statuses pending (censoring-safe)", "timezone": "source BRT (UTC-3) -> store UTC"}, "stats": {"orders": 99441, "events_received": 495156, "events_ingested": 495156, "duplicates": 0, "invalid": 0, "attempts_upserted": 99441, "assignments": 0, "assignments_backfilled": 0, "duration_ms": 110598}}, "upworthy": {"summary": {"source": "Upworthy Research Archive (CC BY 4.0)", "packages": 22666, "tests_total": 4873, "tests_evaluated": 4873, "tests_srm_ok_significant": 1488, "tests_srm_failures": 747}}}}};
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const el = (t, c, h) => { const n = document.createElement(t); if (c) n.className = c; if (h !== undefined) n.innerHTML = h; return n; };
+const fmt = n => n === null || n === undefined ? "—" : Number(n).toLocaleString("en-US");
+const pct = n => n === null || n === undefined ? "—" : Number(n).toFixed(2) + "%";
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NS = "http://www.w3.org/2000/svg";
+const svgEl = (t, attrs) => { const n = document.createElementNS(NS, t); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b === btn));
+  document.querySelectorAll("main > section").forEach(s => s.hidden = s.id !== "s-" + btn.dataset.t);
+  window.scrollTo({ top: 0 });
+}));
+
+/* ---------- overview ---------- */
+(function () {
+  const F = DATA.demo.funnel, o = F.overall, cp = DATA.demo.anomaly.change_point, dep = DATA.demo.anomaly.correlated_deployment;
+  $("#ov-title").textContent = DATA.demo.title;
+  $("#ov-finding").textContent = DATA.demo.finding;
+  const kpis = [
+    { l: "Success rate — baseline", v: pct(o.success_rate_baseline), d: "", c: "flat" },
+    { l: "Success rate — current", v: pct(o.success_rate_current), d: o.delta_pp + " pp vs baseline", c: "down" },
+    { l: "Settled attempts (current)", v: fmt(o.settled_current), d: fmt(o.settled_baseline) + " in baseline", c: "flat" },
+    { l: "Pending (unsettled)", v: fmt(o.pending_current ?? o.pending), d: "excluded from rates by metric v2", c: "flat" },
+    { l: "Worst segment", v: DATA.demo.affected_segments[0]?.slice ?? "upi via gateway-b", d: DATA.demo.affected_segments[0]?.delta_pp + " pp", c: "down" },
+    { l: "A/B experiment", v: "+" + DATA.demo.experiment.effect.delta_pp + " pp", d: "p = " + DATA.demo.experiment.effect.p_value + " · ship candidate", c: "up" },
+  ];
+  kpis.forEach(k => { const n = el("div", "kpi", `<div class="label">${esc(k.l)}</div><div class="value">${esc(k.v)}</div><div class="delta ${k.c}">${esc(k.d)}</div>`); $("#ov-kpis").appendChild(n); });
+  DATA.demo.evidence.forEach(t => $("#ov-evidence").appendChild(el("li", "", esc(t))));
+  DATA.demo.recommended_actions.forEach(t => $("#ov-actions").appendChild(el("li", "", esc(t))));
+  $("#ov-cp").innerHTML = `Change point <b>${esc(cp.label)}</b>: success rate fell from ${pct(cp.baseline_same_hour)} to ${pct(cp.success_rate)} (z = ${cp.z}) on ${esc(cp.attempts)} attempts. Deployment <b>${esc(dep.change_id)}</b> on <b>${esc(dep.service)}</b> (${esc(dep.gateway)}) at ${esc(dep.deployed_at)} — ${esc(dep.relation)} (${esc(dep.note)}).`;
+  $("#ov-plan").textContent = DATA.demo.provenance.plan_rationale;
+  const p = DATA.demo.provenance;
+  $("#ft-prov").innerHTML = `Run <span class="pill">${esc(p.run_id)}</span> · metric v${p.metric_version} · grain ${esc(p.grain)} · planner ${esc(p.planner)} · agent errors ${p.agent_errors.length}`;
+  $("#chip-data").textContent = "Reference data: synthetic demo run " + (F.window?.start || "").slice(0, 10);
+})();
+
+/* ---------- funnel ---------- */
+(function () {
+  const F = DATA.demo.funnel, o = F.overall;
+  [{ l: "Success rate", v: pct(o.success_rate_current), d: o.delta_pp + " pp", c: "down" },
+   { l: "Settled", v: fmt(o.settled_current), d: "baseline " + fmt(o.settled_baseline), c: "flat" },
+   { l: "Succeeded", v: fmt(F.stages[3].current), d: "baseline " + fmt(F.stages[3].baseline), c: "down" }]
+    .forEach(k => $("#fu-kpis").appendChild(el("div", "kpi", `<div class="label">${esc(k.l)}</div><div class="value">${esc(k.v)}</div><div class="delta ${k.c}">${esc(k.d)}</div>`)));
+  // grouped bar chart
+  const stages = F.stages, W = 760, rowH = 46, pad = 8;
+  const max = Math.max(...stages.map(s => Math.max(s.current, s.baseline)));
+  const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${stages.length * rowH + pad}`, role: "img", "aria-label": "Funnel conversion chart" });
+  stages.forEach((s, i) => {
+    const y = i * rowH + pad;
+    const w1 = (s.current / max) * (W - 190), w2 = (s.baseline / max) * (W - 190);
+    const lbl = svgEl("text", { x: 0, y: y + 20, fill: "#e6edf7", "font-size": 13, "font-weight": 600 });
+    lbl.textContent = s.stage.replace("_", " ");
+    svg.appendChild(lbl);
+    svg.appendChild(svgEl("rect", { x: 120, y: y, width: w1, height: 14, rx: 4, fill: "#4f8ef7" })).appendChild(svgEl("title", {}, `${s.stage} — current: ${fmt(s.current)} (${pct(s.conversion_current)})`));
+    svg.appendChild(svgEl("rect", { x: 120, y: y + 17, width: w2, height: 14, rx: 4, fill: "#31415f" })).appendChild(svgEl("title", {}, `${s.stage} — baseline: ${fmt(s.baseline)} (${pct(s.conversion_baseline)})`));
+    const t = svgEl("text", { x: 126 + Math.max(w1, w2), y: y + 20, fill: s.delta_pp < 0 ? "#ef5350" : "#2ecc71", "font-size": 12, "font-weight": 700 });
+    t.textContent = (s.delta_pp > 0 ? "+" : "") + s.delta_pp + " pp";
+    svg.appendChild(t);
+  });
+  $("#fu-chart").appendChild(svg);
+  // table
+  const tb = $("#fu-table");
+  tb.innerHTML = `<tr><th>Stage</th><th class="num">Current</th><th class="num">Baseline</th><th class="num">Conv. current</th><th class="num">Conv. baseline</th><th class="num">Δ</th></tr>`;
+  stages.forEach(s => tb.appendChild(el("tr", "", `<td>${esc(s.stage)}</td><td class="num">${fmt(s.current)}</td><td class="num">${fmt(s.baseline)}</td><td class="num">${pct(s.conversion_current)}</td><td class="num">${pct(s.conversion_baseline)}</td><td class="num ${s.delta_pp < 0 ? "neg" : "pos"}">${s.delta_pp} pp</td>`)));
+})();
+
+/* ---------- segments ---------- */
+(function () {
+  const dims = Object.keys(DATA.demo.segments);
+  const switchEl = $("#seg-switch");
+  let current = dims[0];
+  dims.forEach((d, i) => {
+    const b = el("button", "seg-btn", esc(d.replace("_", " ")));
+    b.setAttribute("aria-pressed", i === 0);
+    b.addEventListener("click", () => { current = d; switchEl.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); render(); });
+    switchEl.appendChild(b);
+  });
+  function render() {
+    const rows = DATA.demo.segments[current];
+    $("#seg-chart-title").textContent = "Success rate — " + current.replace("_", " ");
+    const tb = $("#seg-table");
+    tb.innerHTML = `<tr><th>Value</th><th class="num">Current</th><th class="num">Baseline</th><th class="num">Δ</th><th class="num">Attempts</th><th>Rate drop</th></tr>`;
+    rows.forEach(r => {
+      const neg = r.delta_pp < -1;
+      tb.appendChild(el("tr", "", `<td>${esc(r.value)}</td><td class="num">${pct(r.success_rate_current)}</td><td class="num">${pct(r.success_rate_baseline)}</td><td class="num ${neg ? "neg" : "pos"}">${r.delta_pp} pp</td><td class="num">${fmt(r.attempts_current)}</td><td><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.abs(r.delta_pp) * 3.2)}%;background:${neg ? "#ef5350" : "#2ecc71"}" title="${r.delta_pp} pp"></div></div></td>`));
+    });
+    // horizontal comparison chart
+    const W = 760, rowH = 40, max = Math.max(...rows.map(r => r.success_rate_baseline));
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${rows.length * rowH + 8}` });
+    rows.forEach((r, i) => {
+      const y = i * rowH + 8, x0 = 150, avail = W - x0 - 90;
+      const t = svgEl("text", { x: 0, y: y + 14, fill: "#e6edf7", "font-size": 12.5 });
+      t.textContent = r.value;
+      svg.appendChild(t);
+      svg.appendChild(svgEl("rect", { x: x0, y: y, width: (r.success_rate_baseline / max) * avail, height: 12, rx: 3, fill: "#31415f" })).appendChild(svgEl("title", {}, `baseline ${pct(r.success_rate_baseline)}`));
+      svg.appendChild(svgEl("rect", { x: x0, y: y + 15, width: (r.success_rate_current / max) * avail, height: 12, rx: 3, fill: r.delta_pp < -1 ? "#ef5350" : "#2ecc71" })).appendChild(svgEl("title", {}, `current ${pct(r.success_rate_current)} (${r.delta_pp} pp)`));
+      const lab = svgEl("text", { x: x0 + (r.success_rate_current / max) * avail + 8, y: y + 22, fill: r.delta_pp < -1 ? "#ef5350" : "#8ea0bf", "font-size": 11.5, "font-weight": r.delta_pp < -1 ? 700 : 400 });
+      lab.textContent = pct(r.success_rate_current);
+      svg.appendChild(lab);
+    });
+    $("#seg-chart").replaceChildren(svg);
+  }
+  render();
+})();
+
+/* ---------- anomaly ---------- */
+(function () {
+  const A = DATA.demo.anomaly, s = A.hourly_series;
+  const W = 800, H = 300, padL = 44, padR = 14, padT = 14, padB = 40;
+  const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Hourly success rate chart" });
+  const xs = i => padL + (i / (s.length - 1)) * (W - padL - padR);
+  const ys = v => padT + (1 - v / 100) * (H - padT - padB);
+  for (let g = 0; g <= 100; g += 25) {
+    svg.appendChild(svgEl("line", { x1: padL, x2: W - padR, y1: ys(g), y2: ys(g), stroke: "#1e2a44" }));
+    const t = svgEl("text", { x: 4, y: ys(g) + 4, fill: "#8ea0bf", "font-size": 11 });
+    t.textContent = g + "%"; svg.appendChild(t);
+  }
+  const line = (key, color, width) => {
+    const pts = s.map((d, i) => `${xs(i)},${ys(d[key])}`).join(" ");
+    svg.appendChild(svgEl("polyline", { points: pts, fill: "none", stroke: color, "stroke-width": width }));
+    s.forEach((d, i) => svg.appendChild(svgEl("circle", { cx: xs(i), cy: ys(d[key]), r: 3.4, fill: color })).appendChild(svgEl("title", {}, `${d.hour} — current ${pct(d.success_rate)}, baseline ${pct(d.baseline_same_hour)}, z=${d.z}, n=${d.attempts}`)));
+  };
+  line("baseline_same_hour", "#f0b429", 1.6);
+  line("success_rate", "#4f8ef7", 2.4);
+  const ci = s.findIndex(d => d.hour === A.change_point.hour);
+  if (ci >= 0) svg.appendChild(svgEl("circle", { cx: xs(ci), cy: ys(A.change_point.success_rate), r: 5.5, fill: "#ef5350", stroke: "#0b1220", "stroke-width": 2 })).appendChild(svgEl("title", {}, `change point ${A.change_point.label}: ${pct(A.change_point.success_rate)} (z=${A.change_point.z})`));
+  const depX = xs(ci) + (W - padL - padR) / s.length * 0.5;
+  const depLine = svgEl("line", { x1: depX, x2: depX, y1: padT, y2: H - padB, stroke: "#7c5cff", "stroke-dasharray": "4 4" });
+  depLine.appendChild(svgEl("title", {}, `CHG-8841 deployed 10:15`));
+  svg.appendChild(depLine);
+  const dt = svgEl("text", { x: depX + 5, y: padT + 12, fill: "#7c5cff", "font-size": 11, "font-weight": 600 });
+  dt.textContent = "CHG-8841 · 10:15"; svg.appendChild(dt);
+  svg.appendChild(svgEl("text", { x: W / 2, y: H - 8, fill: "#8ea0bf", "font-size": 11 })).textContent = "hour of day (2026-11-21)";
+  $("#an-chart").appendChild(svg);
+  const c = A.rate_context, d = A.correlated_deployment;
+  [{ l: "Mean before change point", v: pct(c.mean_before_change_point), d: "upi via gateway-b", c: "flat" },
+   { l: "Mean after change point", v: pct(c.mean_after_change_point), d: A.change_point.z + " z-score", c: "down" },
+   { l: "Deployment lead time", v: Math.abs(d.lead_time_minutes) + " min", d: d.relation, c: "flat" }]
+    .forEach(k => $("#an-cards").appendChild(el("div", "kpi", `<div class="label">${esc(k.l)}</div><div class="value">${esc(k.v)}</div><div class="delta ${k.c}">${esc(k.d)}</div>`)));
+  $("#an-interp").textContent = A.interpretation;
+})();
+
+/* ---------- experiment ---------- */
+(function () {
+  const E = DATA.demo.experiment;
+  $("#ex-decision").textContent = E.decision;
+  $("#ex-reasons").textContent = E.decision_reasons.join("; ");
+  [{ l: "Effect (B vs A)", v: "+" + E.effect.delta_pp + " pp", d: "relative uplift " + E.effect.relative_uplift_pct + "%", c: "up" },
+   { l: "p-value", v: String(E.effect.p_value), d: "z = " + E.effect.z + " · significant", c: "up" },
+   { l: "SRM check", v: E.srm.ok ? "PASS" : "FAIL", d: "χ² p = " + E.srm.p_value, c: E.srm.ok ? "up" : "down" }]
+    .forEach(k => $("#ex-kpis").appendChild(el("div", "kpi", `<div class="label">${esc(k.l)}</div><div class="value">${esc(k.v)}</div><div class="delta ${k.c}">${esc(k.d)}</div>`)));
+  // variant bars
+  const svg = svgEl("svg", { class: "chart", viewBox: "0 0 420 150" });
+  [{ n: "A (control)", v: E.control.success_rate, c: "#31415f", sub: fmt(E.control.attempts) + " attempts" },
+   { n: "B (treatment)", v: E.treatment.success_rate, c: "#2ecc71", sub: fmt(E.treatment.attempts) + " attempts" }].forEach((r, i) => {
+    const y = 20 + i * 58;
+    const t = svgEl("text", { x: 0, y: y + 12, fill: "#e6edf7", "font-size": 12.5, "font-weight": 600 });
+    t.textContent = r.n; svg.appendChild(t);
+    const t2 = svgEl("text", { x: 0, y: y + 28, fill: "#8ea0bf", "font-size": 10.5 });
+    t2.textContent = r.sub; svg.appendChild(t2);
+    svg.appendChild(svgEl("rect", { x: 120, y: y, width: (r.v / 100) * 230, height: 22, rx: 5, fill: r.c })).appendChild(svgEl("title", {}, `${r.n}: ${pct(r.v)}`));
+    const v = svgEl("text", { x: 128 + (r.v / 100) * 230, y: y + 16, fill: "#e6edf7", "font-size": 12.5, "font-weight": 700 });
+    v.textContent = pct(r.v); svg.appendChild(v);
+  });
+  $("#ex-chart").appendChild(svg);
+  // guardrails
+  const tb = $("#ex-guard");
+  tb.innerHTML = `<tr><th>Metric</th><th class="num">A</th><th class="num">B</th><th class="num">Check</th></tr>`;
+  E.guardrail_checks.forEach(g => tb.appendChild(el("tr", "", `<td>${esc(g.name)}</td><td class="num">${esc(g.control)}</td><td class="num">${esc(g.treatment)}</td><td class="num ${g.ok ? "pos" : "neg"}">${g.ok ? "PASS" : "BREACH"}</td>`)));
+  // stats
+  const st = $("#ex-stats");
+  st.innerHTML = `<tr><th>Quantity</th><th>Value</th></tr>`;
+  [["experiment", E.experiment_id], ["assignments A : B", `${fmt(E.assignments.A)} : ${fmt(E.assignments.B)}`],
+   ["SRM", `χ²=${E.srm.chi2}, df=${E.srm.degrees_of_freedom}, p=${E.srm.p_value}`],
+   ["control succeeded", `${fmt(E.control.succeeded)} / ${fmt(E.control.attempts)} (${pct(E.control.success_rate)})`],
+   ["treatment succeeded", `${fmt(E.treatment.succeeded)} / ${fmt(E.treatment.attempts)} (${pct(E.treatment.success_rate)})`],
+   ["absolute delta", "+" + E.effect.delta_pp + " pp"], ["z statistic", String(E.effect.z)],
+   ["p-value", String(E.effect.p_value)], ["MDE", E.effect.mde_pp + " pp"],
+   ["relative uplift", E.effect.relative_uplift_pct + "%"]].forEach(r => st.appendChild(el("tr", "", `<td>${esc(r[0])}</td><td>${esc(r[1])}</td>`)));
+})();
+
+/* ---------- governance ---------- */
+(function () {
+  const uniq = [...new Set(DATA.demo.provenance.audit.map(a => a.template))];
+  uniq.forEach(t => $("#gov-templates").appendChild(el("li", "", `<b>${esc(t)}</b>`)));
+  $("#gov-note").textContent = `${uniq.length} distinct versioned templates executed ${DATA.demo.provenance.audit.length} times in the reference run — every call logged with agent, row count and duration.`;
+  const tb = $("#gov-audit");
+  tb.innerHTML = `<tr><th>#</th><th>Agent</th><th>Template</th><th class="num">Rows</th><th class="num">ms</th><th class="num">SQL</th></tr>`;
+  DATA.demo.provenance.audit.forEach((a, i) => tb.appendChild(el("tr", "", `<td>${i + 1}</td><td>${esc(a.agent)}</td><td>${esc(a.template)}</td><td class="num">${fmt(a.rows)}</td><td class="num">${a.duration_ms}</td><td class="num"><details><summary>view</summary><pre>${esc(a.sql)}</pre></details></td>`)));
+  $("#gov-sql").textContent = DATA.demo.provenance.audit[0].sql;
+})();
+
+/* ---------- real data ---------- */
+(function () {
+  const R = DATA.real, o = R.funnel_overall;
+  $("#rd-finding").textContent = R.finding;
+  R.evidence.forEach(t => $("#rd-evidence").appendChild(el("li", "", esc(t))));
+  R.recommended_actions.forEach(t => $("#rd-actions").appendChild(el("li", "", esc(t))));
+  const kpis = [
+    { l: "Success rate — current", v: pct(o.success_rate_current), d: o.delta_pp + " pp vs baseline", c: o.delta_pp < -1 ? "down" : "flat" },
+    { l: "Settled (current)", v: fmt(o.settled_current), d: "baseline " + fmt(o.settled_baseline), c: "flat" },
+    { l: "Data source", v: "Olist + Upworthy", d: "checksum-verified raw extracts", c: "flat" },
+  ];
+  kpis.forEach(k => $("#rd-kpis").appendChild(el("div", "kpi", `<div class="label">${esc(k.l)}</div><div class="value">${esc(k.v)}</div><div class="delta ${k.c}">${esc(k.d)}</div>`)));
+  const dp = R.data_provenance || {};
+  const bits = [];
+  if (dp.olist) bits.push(`<b>Olist e-commerce payments</b> — ${esc(dp.olist.orders ?? "orders")} real orders mapped to ${esc(dp.olist.events ?? "payment")} events; contract checks: unknown types rejected, split payments summed, clock skew neutralized.`);
+  if (dp.upworthy) bits.push(`<b>Upworthy A/B archive</b> — ${esc(dp.upworthy.experiments ?? "experiments")} natural experiments re-scored with the same z-test/SRM engine (Bonferroni-adjusted).`);
+  $("#rd-src").innerHTML = bits.join("<br><br>") || `Source: ${esc(R.data_source)}. Real vocabularies (boleto, not_defined, …) accepted by the governed layer without schema drift.`;
+  $("#chip-data").textContent = "Reference data: synthetic demo + real-data null";
+})();
+
+/* ---------- architecture ---------- */
+(function () {
+  const stages = [
+    { x: 10, w: 150, t: "Producers", s: ["synthetic generator", "Olist / Upworthy adapters"] },
+    { x: 175, w: 130, t: "Transport", s: ["in-memory bus / Kafka"] },
+    { x: 320, w: 165, t: "Ingest worker", s: ["dedup · reorder-safe", "dead-letter · late settle"] },
+    { x: 500, w: 140, t: "Store", s: ["SQLite / PostgreSQL", "WAL tuned"] },
+    { x: 655, w: 145, t: "Governed SQL", s: ["templates · row caps", "full audit log"] },
+  ];
+  const W = 810, H = 150;
+  const svg = svgEl("svg", { class: "arch-svg", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Architecture diagram" });
+  stages.forEach((st, i) => {
+    svg.appendChild(svgEl("rect", { x: st.x, y: 30, width: st.w, height: 92, rx: 12, fill: "#121a2e", stroke: "#1e2a44" }));
+    const t = svgEl("text", { x: st.x + 14, y: 56, fill: "#e6edf7", "font-size": 13.5, "font-weight": 700 });
+    t.textContent = st.t; svg.appendChild(t);
+    st.s.forEach((line, j) => { const lt = svgEl("text", { x: st.x + 14, y: 78 + j * 17, fill: "#8ea0bf", "font-size": 11 }); lt.textContent = line; svg.appendChild(lt); });
+    if (i < stages.length - 1) {
+      const x1 = st.x + st.w, x2 = stages[i + 1].x;
+      svg.appendChild(svgEl("line", { x1: x1 + 2, x2: x2 - 4, y1: 76, y2: 76, stroke: "#4f8ef7", "stroke-width": 2 }));
+      svg.appendChild(svgEl("path", { d: `M ${x2 - 10} 71 L ${x2 - 2} 76 L ${x2 - 10} 81 Z`, fill: "#4f8ef7" }));
+    }
+  });
+  const at = svgEl("text", { x: W / 2, y: 20, fill: "#e6edf7", "font-size": 13, "font-weight": 700 });
+  at.textContent = "event flow"; svg.appendChild(at);
+  $("#arch-diagram").appendChild(svg);
+  // langgraph flow
+  const nodes = ["plan", "funnel", "segment", "anomaly", "experiment", "report"];
+  const fw = 810, n = nodes.length, bw = 96, gap = (fw - 20 - n * bw) / (n - 1);
+  const fsvg = svgEl("svg", { class: "arch-svg", viewBox: `0 0 ${fw} 92` });
+  nodes.forEach((nd, i) => {
+    const x = 10 + i * (bw + gap);
+    fsvg.appendChild(svgEl("rect", { x, y: 20, width: bw, height: 44, rx: 10, fill: nd === "report" ? "rgba(46,204,113,.12)" : "rgba(79,142,247,.10)", stroke: nd === "report" ? "#2ecc71" : "#4f8ef7" }));
+    const t = svgEl("text", { x: x + bw / 2, y: 46, fill: "#e6edf7", "font-size": 12.5, "text-anchor": "middle", "font-weight": 700 });
+    t.textContent = nd; fsvg.appendChild(t);
+    if (i < n - 1) { fsvg.appendChild(svgEl("line", { x1: x + bw + 2, x2: x + bw + gap - 3, y1: 42, y2: 42, stroke: "#4f8ef7" })); fsvg.appendChild(svgEl("path", { d: `M ${x + bw + gap - 9} 38 L ${x + bw + gap - 3} 42 L ${x + bw + gap - 9} 46 Z`, fill: "#4f8ef7" })); }
+  });
+  const note = svgEl("text", { x: 10, y: 84, fill: "#8ea0bf", "font-size": 10.5 });
+  note.textContent = "supervisor routes by plan + material_drop; retry budget per agent; every step reads via governed SQL only";
+  fsvg.appendChild(note);
+  $("#arch-flow").appendChild(fsvg);
+})();
+
+/* ---------- connect ---------- */
+(function () {
+  const btn = $("#api-go"), out = $("#api-out");
+  btn.addEventListener("click", async () => {
+    const base = ($("#api-url").value || "").trim().replace(/\/+$/, "");
+    if (!base) { out.innerHTML = `<p class="neg">Enter a base URL, e.g. http://localhost:8000</p>`; return; }
+    out.innerHTML = `<p class="mut">Connecting…</p>`;
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 6000);
+    try {
+      const h = await fetch(base + "/api/health", { signal: ctrl.signal });
+      const j = await h.json();
+      $("#chip-live").textContent = "Live API: connected";
+      $("#chip-live").classList.add("ok");
+      let inv = "";
+      try { const r = await fetch(base + "/api/investigations?limit=5", { signal: ctrl.signal }); const list = await r.json(); inv = `<div class="table-scroll" style="margin-top:12px"><table><tr><th>Run</th><th>Status</th><th>Finding</th></tr>${list.map(x => `<tr><td class="code">${esc(String(x.run_id).slice(0, 8))}…</td><td>${esc(x.status)}</td><td style="white-space:normal;min-width:260px">${esc(x.finding || "—")}</td></tr>`).join("")}</table></div>`; } catch { }
+      out.innerHTML = `<div class="card" style="margin-top:10px"><h3>Health</h3><div class="code">${esc(JSON.stringify(j, null, 2))}</div>${inv}</div>`;
+    } catch (e) {
+      $("#chip-live").textContent = "Live API: not connected";
+      out.innerHTML = `<p class="neg">Could not reach ${esc(base)} (${e.name === "AbortError" ? "timeout" : esc(e.message)}). Start the backend with <span class="code">uvicorn paylens.api.main:app --port 8000</span> — CORS is enabled for local dashboards.</p>`;
+    } finally { clearTimeout(timer); }
+  });
+})();
+</script>
+</body>
+</html>

@@ -51,6 +51,28 @@ layers.
 
 ## The reference scenario (bundled synthetic data)
 
+### 3. Interactive web console (static, Vercel-ready)
+
+`web/index.html` is a self-contained console (no build step, no external
+dependencies) covering every aspect of the system with the repository's
+reference run embedded: overview KPIs, funnel, segment rankings, anomaly
+chart with the change point + deployment marker, A/B readout, the governed
+SQL audit log, the real-data (Olist/Upworthy) results and the architecture.
+
+```bash
+# serve locally
+python -m http.server 8080 --directory web     # http://localhost:8080
+
+# or deploy to Vercel (zero config - see vercel.json)
+vercel        # from the repo root
+```
+
+It stays fully functional as a static site; to browse fresh data, run the
+API locally (`uvicorn paylens.api.main:app --port 8000`) and connect from
+the **Connect / Deploy** tab.
+
+## The reference scenario (bundled synthetic data)
+
 Two days of traffic (~92% success on day 1). At 10:15 on day 2, an
 infrastructure deployment (`CHG-8841`) triggers a timeout storm for UPI
 traffic routed via Gateway B; overall success lands near 82%. A 50/50
