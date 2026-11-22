@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+exclude = ["docs/"]
+
+[tool.ruff.lint]
+# F = pyflakes (real errors), E9 = syntax, W6 = deprecated constructs.
+# Stylistic rules (line length, quoting) are left to taste; correctness first.
+select = ["F", "E9", "W6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # the deprecation warning fires at import time in older fastapi stacks; tracked
+    "ignore::DeprecationWarning:fastapi",
+]

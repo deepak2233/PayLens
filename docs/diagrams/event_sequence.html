@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { --text: #142840; --sub: #4a6a88; --border: #c0d0e2; --deep: #1a4a7a; --accent: #2d7ab3; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+         background: #FFF; color: var(--text); -webkit-font-smoothing: antialiased; }
+  #root { width: fit-content; margin: 0 auto; padding: 36px 30px; }
+  .flow-title { font-size: 24px; font-weight: 700; text-align: center; }
+  .flow-subtitle { font-size: 15px; color: var(--sub); text-align: center; margin: 6px 0 26px; }
+  .canvas { position: relative; width: 1050px; height: 810px; }
+  .actor { position: absolute; top: 20px; width: 170px; background: var(--deep); color: #FFFFFF;
+           border-radius: 10px; padding: 9px 10px; text-align: center; }
+  .actor b { display: block; font-size: 15.5px; line-height: 1.25; }
+  .actor span { display: block; font-size: 12.5px; color: #BFD7EA; margin-top: 2px; }
+  svg.wires { position: absolute; inset: 0; pointer-events: none; }
+  .msg { position: absolute; font-size: 16.5px; color: #1E3A5F; text-align: center;
+         background: #FFFFFF; border: 1.5px solid var(--border); border-radius: 6px;
+         padding: 3px 10px; white-space: nowrap; }
+  .msg b { color: var(--accent); font-weight: 700; }
+  .msg.ret { color: #065F46; }
+  .msg.ret b { color: #065F46; }
+  .selfnote { position: absolute; font-size: 15px; color: #33506d; background: #F8FAFC;
+              border: 1.5px dashed #8AA6C0; border-radius: 8px; padding: 8px 12px; text-align: left; line-height: 1.4; }
+  .phase { position: absolute; left: 20px; width: 1010px; font-size: 14px; letter-spacing: 1.5px;
+           color: #64748B; text-transform: uppercase; border-bottom: 1.5px solid var(--border); padding-bottom: 4px; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="flow-title">Event and investigation flow</div>
+  <div class="flow-subtitle">From payment attempt to verifiable report &mdash; dotted returns carry only computed results</div>
+
+  <div class="canvas">
+    <div class="phase" style="top: 116px;">ingestion path &mdash; continuous</div>
+    <div class="phase" style="top: 322px;">investigation path &mdash; on demand</div>
+
+    <svg class="wires" width="1050" height="810" viewBox="0 0 1050 810">
+      <defs>
+        <marker id="s" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#2d7ab3"/>
+        </marker>
+        <marker id="g" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#065F46"/>
+        </marker>
+      </defs>
+      <line x1="130" y1="100" x2="130"  y2="786" stroke="#B9CBDD" stroke-width="2" stroke-dasharray="5 5"/>
+      <line x1="330" y1="100" x2="330"  y2="786" stroke="#B9CBDD" stroke-width="2" stroke-dasharray="5 5"/>
+      <line x1="530" y1="100" x2="530"  y2="786" stroke="#B9CBDD" stroke-width="2" stroke-dasharray="5 5"/>
+      <line x1="730" y1="100" x2="730"  y2="786" stroke="#B9CBDD" stroke-width="2" stroke-dasharray="5 5"/>
+      <line x1="930" y1="100" x2="930"  y2="786" stroke="#B9CBDD" stroke-width="2" stroke-dasharray="5 5"/>
+
+      <line x1="130" y1="170" x2="322" y2="170" stroke="#2d7ab3" stroke-width="2.2" marker-end="url(#s)"/>
+      <line x1="330" y1="240" x2="522" y2="240" stroke="#2d7ab3" stroke-width="2.2" marker-end="url(#s)"/>
+
+      <line x1="930" y1="390" x2="738" y2="390" stroke="#2d7ab3" stroke-width="2.2" marker-end="url(#s)"/>
+      <line x1="730" y1="480" x2="538" y2="480" stroke="#2d7ab3" stroke-width="2.2" marker-end="url(#s)"/>
+      <line x1="530" y1="610" x2="722" y2="610" stroke="#065F46" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#g)"/>
+      <line x1="730" y1="680" x2="922" y2="680" stroke="#065F46" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#g)"/>
+    </svg>
+
+    <div class="actor" style="left: 45px;"><b>Payment app</b><span>checkout &amp; SDKs</span></div>
+    <div class="actor" style="left: 245px;"><b>Apache Kafka</b><span>payment-events,<br>exposures</span></div>
+    <div class="actor" style="left: 445px;"><b>Consumer +<br>PostgreSQL</b><span>ingest &amp; store</span></div>
+    <div class="actor" style="left: 645px;"><b>Supervisor +<br>agents</b><span>LangGraph, governed SQL</span></div>
+    <div class="actor" style="left: 845px;"><b>Analyst dashboard</b><span>FastAPI + review UI</span></div>
+
+    <div class="msg" style="left: 88px; top: 140px;"><b>1</b>&ensp;publish lifecycle events per attempt</div>
+    <div class="msg" style="left: 245px; top: 210px;"><b>2</b>&ensp;consume batch (at-least-once)</div>
+    <div class="selfnote" style="left: 548px; top: 258px; width: 330px;"><b>3</b>&ensp;validate schema &rarr; de-duplicate event_id &rarr;<br>derive attempt state (monotone rank) &rarr; store;<br>unsettled attempts stay <em>pending</em></div>
+
+    <div class="msg" style="left: 758px; top: 362px;"><b>4</b>&ensp;&ldquo;Investigate the UPI drop&rdquo;</div>
+    <div class="selfnote" style="left: 468px; top: 352px; width: 250px;"><b>5</b>&ensp;plan windows (24 h vs<br>previous 24 h) &middot; invoke<br>graph &middot; checkpoint run_id</div>
+    <div class="msg" style="left: 528px; top: 452px;"><b>6</b>&ensp;governed SELECTs (read-only)</div>
+    <div class="selfnote" style="left: 468px; top: 502px; width: 250px;"><b>7</b>&ensp;every execution audited:<br>agent, template, params,<br>rows, duration, exact SQL</div>
+    <div class="msg ret" style="left: 536px; top: 582px;"><b>8</b>&ensp;rows returned</div>
+    <div class="msg ret" style="left: 742px; top: 652px;"><b>9</b>&ensp;report + provenance</div>
+    <div class="selfnote" style="left: 755px; top: 706px; width: 272px;"><b>10</b>&ensp;engineers re-run the listed<br>queries to verify the numbers,<br>then decide (human approval)</div>
+  </div>
+</div>
+</body>
+</html>

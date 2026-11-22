@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { --text: #142840; --sub: #4a6a88; --border: #c0d0e2; --deep: #1a4a7a; --accent: #2d7ab3; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+         background: #FFF; color: var(--text); -webkit-font-smoothing: antialiased; }
+  #root { width: 840px; margin: 0 auto; padding: 36px 30px; }
+  .flow-title { font-size: 24px; font-weight: 700; text-align: center; }
+  .flow-subtitle { font-size: 15px; color: var(--sub); text-align: center; margin: 6px 0 26px; }
+  .canvas { position: relative; width: 780px; height: 575px; }
+  svg.wires { position: absolute; inset: 0; pointer-events: none; }
+  .entity { position: absolute; width: 225px; background: #FFFFFF; border: 2.5px solid var(--accent);
+            border-radius: 10px; box-shadow: 0 1px 3px rgba(20,40,64,.08); overflow: hidden; }
+  .entity.dim { border-color: #8AA6C0; background: #F8FAFC; }
+  .entity h3 { font-size: 15px; background: var(--deep); color: #FFFFFF; padding: 7px 12px; font-weight: 600; }
+  .entity.dim h3 { background: #5B7A99; }
+  .entity ul { list-style: none; padding: 6px 12px 8px; }
+  .entity li { font-size: 13px; color: #33475e; padding: 2.5px 0; border-bottom: 1px dashed #E7EEF5;
+               display: flex; justify-content: space-between; gap: 8px; }
+  .entity li:last-child { border-bottom: none; }
+  .entity li .t { color: var(--sub); text-align: right; font-size: 12px; }
+  .k { color: #B3541E; font-weight: 600; font-size: 11.5px; margin-right: 4px; }
+  .fk { color: var(--accent); font-weight: 600; font-size: 11.5px; margin-right: 4px; }
+  .lbl { position: absolute; font-size: 13.5px; color: #33506d; background: #FFFFFF;
+         border: 1.5px solid var(--border); border-radius: 6px; padding: 2px 9px; white-space: nowrap; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px 26px; justify-content: center; margin-top: 24px; font-size: 14px;
+            color: var(--sub); background: #F8FAFC; border: 1px solid var(--border);
+            border-radius: 8px; padding: 10px 18px; width: 780px; margin-left: auto; margin-right: auto; }
+  .legend .solid, .legend .dash { display: inline-block; width: 34px; height: 0; vertical-align: middle; margin-right: 7px; }
+  .legend .solid { border-top: 2.5px solid var(--accent); }
+  .legend .dash { border-top: 2.5px dashed #8AA6C0; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="flow-title">Analytical store &mdash; entity relationships</div>
+  <div class="flow-subtitle">PostgreSQL (sql/init.sql) &mdash; one attempt row per payment; events are the raw log</div>
+
+  <div class="canvas">
+    <svg class="wires" width="780" height="575" viewBox="0 0 780 575">
+      <defs>
+        <marker id="arr" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#2d7ab3"/>
+        </marker>
+        <marker id="arrg" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#8AA6C0"/>
+        </marker>
+      </defs>
+      <!-- assignments -> attempts -->
+      <path d="M 247 120 L 286 120" stroke="#2d7ab3" stroke-width="2.2" fill="none" marker-end="url(#arr)"/>
+      <text x="266" y="106" font-size="12.5" fill="#4a6a88" text-anchor="middle" font-family="Arial">variant</text>
+      <!-- attempts -> events -->
+      <path d="M 517 120 L 556 120" stroke="#2d7ab3" stroke-width="2.2" fill="none" marker-end="url(#arr)"/>
+      <text x="536" y="106" font-size="12.5" fill="#4a6a88" text-anchor="middle" font-family="Arial">1 : N</text>
+      <!-- investigations -> audit -->
+      <path d="M 558 420 L 519 420" stroke="#2d7ab3" stroke-width="2.2" fill="none" marker-end="url(#arr)"/>
+      <text x="538" y="404" font-size="12.5" fill="#4a6a88" text-anchor="middle" font-family="Arial">run_id</text>
+      <!-- metric_definitions pinned by investigations (dashed, below) -->
+      <path d="M 132 446 L 132 520 L 672 520 L 672 492" stroke="#8AA6C0" stroke-width="2.2"
+            stroke-dasharray="6 4" fill="none" marker-end="url(#arrg)"/>
+    </svg>
+
+    <!-- Row 1 -->
+    <div class="entity" style="left: 20px; top: 30px;">
+      <h3>experiment_assignments</h3>
+      <ul>
+        <li><span><span class="k">PK</span>id</span><span class="t">serial</span></li>
+        <li><span>experiment_id</span><span class="t">varchar</span></li>
+        <li><span>variant</span><span class="t">'A' | 'B'</span></li>
+        <li><span>pseudo_customer_id</span><span class="t">anonymous</span></li>
+        <li><span>assigned_at</span><span class="t">timestamptz</span></li>
+        <li><span>UQ (experiment, customer)</span><span class="t">1st write wins</span></li>
+      </ul>
+    </div>
+
+    <div class="entity" style="left: 290px; top: 30px;">
+      <h3>payment_attempts</h3>
+      <ul>
+        <li><span><span class="k">PK</span>attempt_id</span><span class="t">1 row/payment</span></li>
+        <li><span>method, gateway, bank</span><span class="t">routed slice</span></li>
+        <li><span>geo, app_version, tier</span><span class="t">segment dims</span></li>
+        <li><span>started_at &#8230; terminal_at</span><span class="t">funnel times</span></li>
+        <li><span>status, status_rank</span><span class="t">monotone</span></li>
+        <li><span>settled, dup_charge</span><span class="t">flags</span></li>
+        <li><span>experiment_id, variant</span><span class="t">back-filled</span></li>
+      </ul>
+    </div>
+
+    <div class="entity" style="left: 560px; top: 30px;">
+      <h3>payment_events</h3>
+      <ul>
+        <li><span><span class="k">PK</span>event_id</span><span class="t">dedup key</span></li>
+        <li><span><span class="fk">FK</span>attempt_id</span><span class="t">N / attempt</span></li>
+        <li><span>event_type</span><span class="t">stage</span></li>
+        <li><span>ts</span><span class="t">event time</span></li>
+        <li><span>error_code, latency_ms</span><span class="t">detail</span></li>
+        <li><span>payload</span><span class="t">JSONB</span></li>
+      </ul>
+    </div>
+
+    <!-- Row 2 -->
+    <div class="entity dim" style="left: 20px; top: 306px;">
+      <h3>metric_definitions</h3>
+      <ul>
+        <li><span>metric_name + version</span><span class="t">UQ pair</span></li>
+        <li><span>description</span><span class="t">meaning</span></li>
+        <li><span>formula_sql</span><span class="t">logic</span></li>
+        <li><span>owner, created_at</span><span class="t">steward</span></li>
+      </ul>
+    </div>
+
+    <div class="entity" style="left: 290px; top: 306px;">
+      <h3>query_audit_log</h3>
+      <ul>
+        <li><span><span class="k">PK</span>id</span><span class="t">serial</span></li>
+        <li><span>run_id, agent</span><span class="t">who ran</span></li>
+        <li><span>template, params</span><span class="t">what ran</span></li>
+        <li><span>rows, duration_ms</span><span class="t">cost</span></li>
+        <li><span>sql_text</span><span class="t">exact SQL</span></li>
+      </ul>
+    </div>
+
+    <div class="entity" style="left: 560px; top: 306px;">
+      <h3>investigations</h3>
+      <ul>
+        <li><span><span class="k">PK</span>run_id</span><span class="t">thread id</span></li>
+        <li><span>question</span><span class="t">request</span></li>
+        <li><span>window_start / end</span><span class="t">window</span></li>
+        <li><span>metric_version</span><span class="t">pinned</span></li>
+        <li><span>report JSONB</span><span class="t">finding</span></li>
+        <li><span>status, finished_at</span><span class="t">lifecycle</span></li>
+      </ul>
+    </div>
+
+    <div class="lbl" style="left: 150px; top: 536px;">report pins metric version &nbsp;&middot;&nbsp; deployments correlated by time + gateway</div>
+  </div>
+
+  <div class="legend">
+    <span><span class="solid"></span>foreign-key relationship</span>
+    <span><span class="dash"></span>analytical correlation (no enforced FK)</span>
+  </div>
+</div>
+</body>
+</html>

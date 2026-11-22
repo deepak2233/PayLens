@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { --text: #142840; --sub: #4a6a88; --border: #c0d0e2; --deep: #1a4a7a; --accent: #2d7ab3; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+         background: #FFF; color: var(--text); -webkit-font-smoothing: antialiased; }
+  #root { width: 800px; margin: 0 auto; padding: 36px 30px; }
+  .flow-title { font-size: 24px; font-weight: 700; text-align: center; }
+  .flow-subtitle { font-size: 15px; color: var(--sub); text-align: center; margin: 6px 0 22px; }
+  .phase { border-radius: 12px; padding: 14px 18px; }
+  .phase-title { font-size: 18px; font-weight: 700; padding: 8px 14px; border-radius: 8px; margin-bottom: 10px;
+                 display: flex; justify-content: space-between; align-items: baseline; }
+  .phase-title .tag { font-size: 13.5px; font-weight: 500; opacity: .8; }
+  .phase p { font-size: 15px; line-height: 1.5; color: #2c4560; margin: 0 2px 2px; }
+  .p1 { background: #F0F4F8; } .p1 .phase-title { background: #E3EAF1; color: #334155; border-left: 5px solid #64748B; }
+  .p2 { background: #E8EDF2; } .p2 .phase-title { background: #DDE5EE; color: #1E3A5F; border-left: 5px solid #5B7A99; }
+  .p3 { background: #E0E7EF; } .p3 .phase-title { background: #D5DEE9; color: #1E3050; border-left: 5px solid #4A6B8A; }
+  .p4 { background: #E4ECF5; } .p4 .phase-title { background: #D6E1EE; color: #172540; border-left: 5px solid #3A5C7A; }
+  .p5 { background: #EAF1F8; } .p5 .phase-title { background: #DCE6F0; color: #12203a; border-left: 5px solid #2d7ab3; }
+  .arrow { text-align: center; color: #7E93A8; font-size: 26px; line-height: 1; margin: 8px 0; }
+  .chips { display: flex; gap: 10px; margin-top: 10px; }
+  .chip { flex: 1; background: #FFFFFF; border: 1.5px solid var(--accent); border-radius: 8px;
+          padding: 8px 10px; font-size: 15px; font-weight: 600; color: #1E3A5F; text-align: center; }
+  .chip small { display: block; font-size: 13px; font-weight: 400; color: var(--sub); margin-top: 2px; }
+  .sup { background: #FFFFFF; border: 2px solid var(--deep); border-radius: 8px; padding: 9px 13px;
+         font-size: 15px; color: #12203a; }
+  .rails { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 20px; }
+  .rail { font-size: 13.5px; color: #33506d; background: #F8FAFC; border: 1.5px dashed var(--border);
+          border-radius: 8px; padding: 8px 12px; line-height: 1.4; }
+  .rail b { color: #1E3A5F; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="flow-title">PayLens system architecture</div>
+  <div class="flow-subtitle">Event path (1&ndash;3) and investigation path (4&ndash;5)</div>
+
+  <div class="phase p1">
+    <div class="phase-title"><span>1 &nbsp;Capture</span><span class="tag">payment apps &amp; gateway adapters</span></div>
+    <p>Checkout journeys emit one lifecycle event stream per attempt &mdash; started, method selected, initiated,
+       gateway response, succeeded / failed &mdash; with pseudonymous customer ids, error codes and latency.</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="phase p2">
+    <div class="phase-title"><span>2 &nbsp;Transport</span><span class="tag">Apache Kafka (KRaft)</span></div>
+    <p>Topics <b>payment-events</b> and <b>experiment-exposures</b>, 6 partitions keyed by attempt id.
+       At-least-once delivery; analytics never runs inside the payment transaction path.</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="phase p3">
+    <div class="phase-title"><span>3 &nbsp;Ingest &amp; store</span><span class="tag">Python consumers + PostgreSQL</span></div>
+    <p>Strict schema validation with dead-lettering, event-id de-duplication, monotone attempt-state derivation
+       (out-of-order safe), delayed-outcome flags. Tables: attempts, events, assignments, deployments, metric_definitions.</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="phase p4">
+    <div class="phase-title"><span>4 &nbsp;Intelligence</span><span class="tag">LangGraph supervisor + 4 agents</span></div>
+    <div class="sup"><b>LangGraph supervisor</b> &mdash; plans scope, branches on findings, retries with budget, checkpoints every run</div>
+    <div class="chips">
+      <div class="chip">Funnel<small>where it drops</small></div>
+      <div class="chip">Segment<small>who is affected</small></div>
+      <div class="chip">Anomaly<small>what changed</small></div>
+      <div class="chip">Experiment<small>did it help</small></div>
+    </div>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="phase p5">
+    <div class="phase-title"><span>5 &nbsp;Delivery</span><span class="tag">FastAPI + analytics dashboard</span></div>
+    <p>Investigation report with numeric evidence and recommended actions; every figure links to its governed
+       query, metric version and data window. Mitigation and rollout decisions stay with the bank team.</p>
+  </div>
+
+  <div class="rails">
+    <div class="rail"><b>Governed SQL only</b> &mdash; engineer-authored templates, bound params, read-only, row caps</div>
+    <div class="rail"><b>Query audit log</b> &mdash; agent, template, params, rows, duration, exact SQL per execution</div>
+    <div class="rail"><b>Versioned metrics</b> &mdash; success_rate v1 / v2; reports pin the version used</div>
+    <div class="rail"><b>Hybrid reasoning</b> &mdash; LLM plans and words; SQL + Python compute every figure</div>
+  </div>
+</div>
+</body>
+</html>

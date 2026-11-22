@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600&family=Noto+Serif+SC:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    @page { size: 794px 1123px; margin: 0; }
+    :root {
+      --c-bg: #0a1628;
+      --c-accent: #4da8da;
+      --c-text: #e8f0f8;
+      --c-muted: #7a9bb8;
+      --c-glow: #2d7ab3;
+    }
+    html, body { margin: 0; padding: 0; width: 794px; height: 1123px;
+                 background: var(--c-bg); color: var(--c-text);
+                 font-family: 'Inter', 'Noto Serif SC', sans-serif; }
+    @media screen {
+      html { height: auto; display: flex; justify-content: center; min-height: 100vh; background: var(--c-bg); }
+      body { transform-origin: top center;
+             scale: min(1, calc(100vw / 794), calc(100vh / 1123));
+             margin: 0 auto; box-shadow: 0 0 60px rgba(0,0,0,0.35); }
+    }
+    .cover { width: 794px; height: 1123px; position: relative; box-sizing: border-box;
+             border: none; outline: none; box-shadow: none; }
+    /* Layer 1 - background glow (clipped) */
+    .bg-layer { position: absolute; inset: 0; overflow: hidden; z-index: 1; }
+    .glow-a { position: absolute; left: 0; top: 0; width: 70%; height: 55%;
+              background: radial-gradient(circle at 25% 25%, rgba(45,122,179,0.16), rgba(45,122,179,0) 70%); }
+    .glow-b { position: absolute; right: 0; bottom: 0; width: 75%; height: 60%;
+              background: radial-gradient(circle at 75% 75%, rgba(45,122,179,0.13), rgba(45,122,179,0) 70%); }
+    /* Layer 2 - luminous frame */
+    .frame { position: absolute; left: 60px; right: 60px; top: 80px; bottom: 80px;
+             border: 2px solid var(--c-accent); z-index: 2; }
+    /* Layer 3 - content */
+    .content { position: absolute; inset: 0; z-index: 3; }
+    .kicker { position: absolute; left: 110px; top: 135px;
+              font-size: 11pt; font-weight: 300; color: var(--c-accent);
+              letter-spacing: 5px; text-transform: uppercase; }
+    .hero { position: absolute; left: 110px; top: 236px; max-width: 560px;
+            font-family: 'Playfair Display', 'Noto Serif SC', serif;
+            font-size: 50pt; font-weight: 900; line-height: 1.15; color: var(--c-text);
+            text-shadow: 0 0 24px rgba(77,168,218,0.35); }
+    .hero .sub { display: block; font-size: 20pt; font-weight: 400; letter-spacing: 1px;
+                 color: var(--c-muted); margin-top: 14px;
+                 font-family: 'Inter', 'Noto Serif SC', sans-serif; }
+    .summary { position: absolute; left: 110px; top: 505px; max-width: 520px;
+               font-size: 15pt; line-height: 1.7; color: var(--c-muted); }
+    .org { position: absolute; left: 110px; top: 730px; max-width: 560px;
+           font-size: 18pt; font-weight: 500; color: var(--c-text); }
+    .org small { display: block; font-size: 12pt; font-weight: 300; color: var(--c-muted);
+                 margin-top: 10px; line-height: 1.5; }
+    .date { position: absolute; left: 110px; top: 995px;
+            font-size: 10pt; color: var(--c-muted); letter-spacing: 3px; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <div class="bg-layer">
+      <div class="glow-a"></div>
+      <div class="glow-b"></div>
+    </div>
+    <div class="frame"></div>
+    <div class="content">
+      <div class="kicker">System Design Document</div>
+      <div class="hero">PayLens<span class="sub">Payments Analytics &amp; Experimentation Agents</span></div>
+      <div class="summary">
+        A production-deep design for diagnosing payment failures, attributing them
+        to customer segments and infrastructure change, and evaluating product
+        changes with verifiable statistics &mdash; where the LLM plans and words, and
+        governed SQL and Python compute every number.
+      </div>
+      <div class="org">
+        Payments Platform Engineering
+        <small>Reference design &mdash; accompanied by a runnable implementation and a 35-test suite.
+        All figures in this document come from a reproducible demo run.</small>
+      </div>
+      <div class="date">November 2026 &nbsp;&middot;&nbsp; Version 1.0</div>
+    </div>
+  </div>
+</body>
+</html>

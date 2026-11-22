@@ -1,0 +1,4 @@
+# Production layer extras (Kafka + PostgreSQL transport)
+-r requirements.txt
+kafka-python-ng>=2.2.2
+psycopg2-binary>=2.9.9

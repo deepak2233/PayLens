@@ -1,0 +1,759 @@
+{
+  "title": "Payment Performance Investigation",
+  "finding": "Overall payment success rate decreased from 91.24% to 79.85% in the current window. The decline is concentrated in upi transactions routed through gateway-b (-25.32 pp for that slice). A deployment on payment-gateway-adapter (CHG-8841) fell within the change-point bucket. Review required before any mitigation; the timing evidence does not by itself prove causation.",
+  "evidence": [
+    "Overall success rate moved from 91.24% (baseline) to 79.85% in the current window (-11.39 pp), computed on 11,241 settled attempts (577 still pending).",
+    "Largest funnel-stage conversion change: 'succeeded' 86.89% -> 75.95% (-10.93 pp).",
+    "Decline concentrated in: upi via gateway-b: 91.0% -> 65.68% (-25.32 pp, 5,026 attempts).",
+    "Change point detected at 2026-11-21 10:00 for upi via gateway-b: 90.22% -> 66.22% (z = -7.25, hour grain). Deployment CHG-8841 on payment-gateway-adapter (gateway-b) within the change-point bucket (deployed 2026-11-21T10:15:00) - timing evidence, not proven causation.",
+    "A/B readout (exp-2026-11-checkout-upi-v2): A 80.15% vs B 81.91% (+1.76 pp, p = 0.0015, SRM p = 1.0). Decision: ship candidate: recommend staged rollout with human approval."
+  ],
+  "affected_segments": [
+    {
+      "method": "upi",
+      "gateway": "gateway-b",
+      "success_rate_current": 65.68,
+      "success_rate_baseline": 91.0,
+      "delta_pp": -25.32,
+      "attempts_current": 5275,
+      "settled_current": 5026,
+      "pending_current": 249,
+      "success_deficit": 1272.6
+    }
+  ],
+  "funnel": {
+    "agent": "funnel",
+    "window": {
+      "start": "2026-11-21T01:00:00+00:00",
+      "end": "2026-11-22T01:00:00+00:00"
+    },
+    "baseline": {
+      "start": "2026-11-20T01:00:00+00:00",
+      "end": "2026-11-21T01:00:00+00:00"
+    },
+    "stages": [
+      {
+        "stage": "started",
+        "current": 11818,
+        "baseline": 12041,
+        "conversion_current": 100.0,
+        "conversion_baseline": 100.0,
+        "delta_pp": 0.0
+      },
+      {
+        "stage": "method_selected",
+        "current": 11471,
+        "baseline": 11709,
+        "conversion_current": 97.06,
+        "conversion_baseline": 97.24,
+        "delta_pp": -0.18
+      },
+      {
+        "stage": "initiated",
+        "current": 11241,
+        "baseline": 11467,
+        "conversion_current": 95.12,
+        "conversion_baseline": 95.23,
+        "delta_pp": -0.12
+      },
+      {
+        "stage": "succeeded",
+        "current": 8976,
+        "baseline": 10462,
+        "conversion_current": 75.95,
+        "conversion_baseline": 86.89,
+        "delta_pp": -10.93
+      }
+    ],
+    "overall": {
+      "success_rate_current": 79.85,
+      "success_rate_baseline": 91.24,
+      "delta_pp": -11.39,
+      "settled_current": 11241,
+      "settled_baseline": 11467,
+      "pending_current": 577
+    },
+    "material_drop": true,
+    "biggest_stage_drop": {
+      "stage": "succeeded",
+      "current": 8976,
+      "baseline": 10462,
+      "conversion_current": 75.95,
+      "conversion_baseline": 86.89,
+      "delta_pp": -10.93
+    },
+    "metric_version": 2,
+    "provenance": {
+      "templates": [
+        "funnel_counts"
+      ],
+      "attribution": "attempts attributed by started_at; settled attempts only"
+    }
+  },
+  "segment_rankings": {
+    "method": [
+      {
+        "value": "upi",
+        "success_rate_current": 79.85,
+        "success_rate_baseline": 91.24,
+        "delta_pp": -11.39,
+        "attempts_current": 11241,
+        "success_deficit": 1280.3
+      }
+    ],
+    "gateway": [
+      {
+        "value": "gateway-b",
+        "success_rate_current": 65.68,
+        "success_rate_baseline": 91.0,
+        "delta_pp": -25.32,
+        "attempts_current": 5026,
+        "success_deficit": 1272.6
+      },
+      {
+        "value": "gateway-a",
+        "success_rate_current": 91.31,
+        "success_rate_baseline": 91.42,
+        "delta_pp": -0.11,
+        "attempts_current": 6215,
+        "success_deficit": 6.8
+      }
+    ],
+    "bank": [
+      {
+        "value": "HDFC",
+        "success_rate_current": 79.14,
+        "success_rate_baseline": 90.49,
+        "delta_pp": -11.35,
+        "attempts_current": 3390,
+        "success_deficit": 384.8
+      },
+      {
+        "value": "ICICI",
+        "success_rate_current": 80.32,
+        "success_rate_baseline": 92.05,
+        "delta_pp": -11.73,
+        "attempts_current": 2866,
+        "success_deficit": 336.2
+      },
+      {
+        "value": "SBI",
+        "success_rate_current": 80.26,
+        "success_rate_baseline": 90.94,
+        "delta_pp": -10.68,
+        "attempts_current": 2745,
+        "success_deficit": 293.2
+      },
+      {
+        "value": "Axis",
+        "success_rate_current": 80.3,
+        "success_rate_baseline": 91.92,
+        "delta_pp": -11.62,
+        "attempts_current": 1340,
+        "success_deficit": 155.7
+      },
+      {
+        "value": "Kotak",
+        "success_rate_current": 79.11,
+        "success_rate_baseline": 91.31,
+        "delta_pp": -12.2,
+        "attempts_current": 900,
+        "success_deficit": 109.8
+      }
+    ],
+    "app_version": [
+      {
+        "value": "3.2.0",
+        "success_rate_current": 79.48,
+        "success_rate_baseline": 91.38,
+        "delta_pp": -11.9,
+        "attempts_current": 9589,
+        "success_deficit": 1141.1
+      },
+      {
+        "value": "3.1.0",
+        "success_rate_current": 82.29,
+        "success_rate_baseline": 90.4,
+        "delta_pp": -8.11,
+        "attempts_current": 1107,
+        "success_deficit": 89.8
+      },
+      {
+        "value": "3.3.0-beta",
+        "success_rate_current": 81.47,
+        "success_rate_baseline": 90.4,
+        "delta_pp": -8.93,
+        "attempts_current": 545,
+        "success_deficit": 48.7
+      }
+    ],
+    "geo": [
+      {
+        "value": "IN-MH",
+        "success_rate_current": 79.74,
+        "success_rate_baseline": 90.95,
+        "delta_pp": -11.21,
+        "attempts_current": 3425,
+        "success_deficit": 383.9
+      },
+      {
+        "value": "IN-KA",
+        "success_rate_current": 80.66,
+        "success_rate_baseline": 91.41,
+        "delta_pp": -10.75,
+        "attempts_current": 2787,
+        "success_deficit": 299.6
+      },
+      {
+        "value": "IN-DL",
+        "success_rate_current": 79.64,
+        "success_rate_baseline": 91.32,
+        "delta_pp": -11.68,
+        "attempts_current": 2269,
+        "success_deficit": 265.0
+      },
+      {
+        "value": "IN-TN",
+        "success_rate_current": 79.64,
+        "success_rate_baseline": 91.13,
+        "delta_pp": -11.49,
+        "attempts_current": 1655,
+        "success_deficit": 190.2
+      },
+      {
+        "value": "IN-WB",
+        "success_rate_current": 78.91,
+        "success_rate_baseline": 91.67,
+        "delta_pp": -12.76,
+        "attempts_current": 1105,
+        "success_deficit": 141.0
+      }
+    ],
+    "customer_tier": [
+      {
+        "value": "retail",
+        "success_rate_current": 80.21,
+        "success_rate_baseline": 91.2,
+        "delta_pp": -10.99,
+        "attempts_current": 8980,
+        "success_deficit": 986.9
+      },
+      {
+        "value": "premium",
+        "success_rate_current": 79.02,
+        "success_rate_baseline": 91.06,
+        "delta_pp": -12.04,
+        "attempts_current": 1687,
+        "success_deficit": 203.1
+      },
+      {
+        "value": "vip",
+        "success_rate_current": 76.66,
+        "success_rate_baseline": 92.27,
+        "delta_pp": -15.61,
+        "attempts_current": 574,
+        "success_deficit": 89.6
+      }
+    ]
+  },
+  "anomaly": {
+    "agent": "anomaly",
+    "grain": "hour",
+    "segment": {
+      "method": "upi",
+      "gateway": "gateway-b"
+    },
+    "hourly_series": [
+      {
+        "hour": "01:00",
+        "date": "2026-11-21",
+        "success_rate": 95.83,
+        "baseline_same_hour": 92.86,
+        "delta_pp": 2.98,
+        "z": 0.67,
+        "attempts": 48
+      },
+      {
+        "hour": "02:00",
+        "date": "2026-11-21",
+        "success_rate": 92.86,
+        "baseline_same_hour": 92.31,
+        "delta_pp": 0.55,
+        "z": 0.09,
+        "attempts": 42
+      },
+      {
+        "hour": "03:00",
+        "date": "2026-11-21",
+        "success_rate": 95.0,
+        "baseline_same_hour": 95.83,
+        "delta_pp": -0.83,
+        "z": -0.19,
+        "attempts": 40
+      },
+      {
+        "hour": "04:00",
+        "date": "2026-11-21",
+        "success_rate": 92.54,
+        "baseline_same_hour": 87.93,
+        "delta_pp": 4.61,
+        "z": 0.87,
+        "attempts": 67
+      },
+      {
+        "hour": "05:00",
+        "date": "2026-11-21",
+        "success_rate": 93.33,
+        "baseline_same_hour": 90.2,
+        "delta_pp": 3.14,
+        "z": 0.78,
+        "attempts": 90
+      },
+      {
+        "hour": "06:00",
+        "date": "2026-11-21",
+        "success_rate": 91.1,
+        "baseline_same_hour": 85.71,
+        "delta_pp": 5.38,
+        "z": 1.38,
+        "attempts": 146
+      },
+      {
+        "hour": "07:00",
+        "date": "2026-11-21",
+        "success_rate": 92.38,
+        "baseline_same_hour": 92.48,
+        "delta_pp": -0.1,
+        "z": -0.04,
+        "attempts": 210
+      },
+      {
+        "hour": "08:00",
+        "date": "2026-11-21",
+        "success_rate": 91.29,
+        "baseline_same_hour": 91.67,
+        "delta_pp": -0.38,
+        "z": -0.16,
+        "attempts": 287
+      },
+      {
+        "hour": "09:00",
+        "date": "2026-11-21",
+        "success_rate": 88.99,
+        "baseline_same_hour": 93.63,
+        "delta_pp": -4.64,
+        "z": -2.08,
+        "attempts": 327
+      },
+      {
+        "hour": "10:00",
+        "date": "2026-11-21",
+        "success_rate": 66.22,
+        "baseline_same_hour": 90.22,
+        "delta_pp": -24.0,
+        "z": -7.25,
+        "attempts": 296
+      },
+      {
+        "hour": "11:00",
+        "date": "2026-11-21",
+        "success_rate": 61.21,
+        "baseline_same_hour": 89.0,
+        "delta_pp": -27.79,
+        "z": -7.79,
+        "attempts": 281
+      },
+      {
+        "hour": "12:00",
+        "date": "2026-11-21",
+        "success_rate": 57.65,
+        "baseline_same_hour": 90.85,
+        "delta_pp": -33.19,
+        "z": -9.27,
+        "attempts": 307
+      },
+      {
+        "hour": "13:00",
+        "date": "2026-11-21",
+        "success_rate": 55.98,
+        "baseline_same_hour": 89.72,
+        "delta_pp": -33.73,
+        "z": -8.89,
+        "attempts": 259
+      },
+      {
+        "hour": "14:00",
+        "date": "2026-11-21",
+        "success_rate": 51.93,
+        "baseline_same_hour": 92.57,
+        "delta_pp": -40.64,
+        "z": -10.61,
+        "attempts": 285
+      },
+      {
+        "hour": "15:00",
+        "date": "2026-11-21",
+        "success_rate": 56.47,
+        "baseline_same_hour": 93.99,
+        "delta_pp": -37.52,
+        "z": -9.58,
+        "attempts": 278
+      },
+      {
+        "hour": "16:00",
+        "date": "2026-11-21",
+        "success_rate": 57.04,
+        "baseline_same_hour": 91.92,
+        "delta_pp": -34.89,
+        "z": -9.17,
+        "attempts": 270
+      },
+      {
+        "hour": "17:00",
+        "date": "2026-11-21",
+        "success_rate": 51.39,
+        "baseline_same_hour": 91.56,
+        "delta_pp": -40.17,
+        "z": -11.27,
+        "attempts": 323
+      },
+      {
+        "hour": "18:00",
+        "date": "2026-11-21",
+        "success_rate": 53.59,
+        "baseline_same_hour": 89.71,
+        "delta_pp": -36.12,
+        "z": -11.08,
+        "attempts": 390
+      },
+      {
+        "hour": "19:00",
+        "date": "2026-11-21",
+        "success_rate": 55.66,
+        "baseline_same_hour": 91.35,
+        "delta_pp": -35.7,
+        "z": -10.56,
+        "attempts": 327
+      },
+      {
+        "hour": "20:00",
+        "date": "2026-11-21",
+        "success_rate": 62.98,
+        "baseline_same_hour": 92.7,
+        "delta_pp": -29.72,
+        "z": -8.43,
+        "attempts": 289
+      },
+      {
+        "hour": "21:00",
+        "date": "2026-11-21",
+        "success_rate": 59.91,
+        "baseline_same_hour": 88.18,
+        "delta_pp": -28.27,
+        "z": -6.59,
+        "attempts": 222
+      },
+      {
+        "hour": "22:00",
+        "date": "2026-11-21",
+        "success_rate": 58.21,
+        "baseline_same_hour": 85.71,
+        "delta_pp": -27.51,
+        "z": -5.31,
+        "attempts": 134
+      },
+      {
+        "hour": "23:00",
+        "date": "2026-11-21",
+        "success_rate": 49.07,
+        "baseline_same_hour": 94.96,
+        "delta_pp": -45.88,
+        "z": -7.79,
+        "attempts": 108
+      }
+    ],
+    "change_point": {
+      "hour": "10:00",
+      "date": "2026-11-21",
+      "success_rate": 66.22,
+      "baseline_same_hour": 90.22,
+      "delta_pp": -24.0,
+      "z": -7.25,
+      "attempts": 296,
+      "label": "2026-11-21 10:00"
+    },
+    "rate_context": {
+      "mean_before_change_point": 92.59,
+      "mean_after_change_point": 56.95
+    },
+    "correlated_deployment": {
+      "change_id": "CHG-8841",
+      "service": "payment-gateway-adapter",
+      "gateway": "gateway-b",
+      "deployed_at": "2026-11-21T10:15:00",
+      "note": "Gateway B adapter rollout v2.7.0 (connection-pool resize)",
+      "lead_time_minutes": -15,
+      "relation": "within the change-point bucket"
+    },
+    "interpretation": "Timing evidence only: the metric change point follows the listed deployment; causality must be confirmed by engineers in gateway logs before any rerouting or rollback decision.",
+    "provenance": {
+      "templates": [
+        "hourly_success_rate",
+        "deployments_in_window"
+      ],
+      "method": "hour-over-hour volume-aware z-score vs matched baseline (hour-of-day), sustained for >=2 hours"
+    }
+  },
+  "experiment": {
+    "agent": "experiment",
+    "experiment_id": "exp-2026-11-checkout-upi-v2",
+    "assignments": {
+      "A": 10000,
+      "B": 10000
+    },
+    "srm": {
+      "ok": true,
+      "chi2": 0.0,
+      "p_value": 1.0,
+      "degrees_of_freedom": 1
+    },
+    "control": {
+      "variant": "A",
+      "attempts": 10000,
+      "succeeded": 8015,
+      "success_rate": 80.15
+    },
+    "treatment": {
+      "variant": "B",
+      "attempts": 10000,
+      "succeeded": 8191,
+      "success_rate": 81.91
+    },
+    "effect": {
+      "delta_pp": 1.76,
+      "relative_uplift_pct": 2.2,
+      "z": 3.174,
+      "p_value": "0.0015",
+      "significant": true,
+      "mde_pp": 1.58
+    },
+    "guardrails": [
+      {
+        "variant": "A",
+        "latency_p50_ms": 1348.0,
+        "latency_p95_ms": 1780.0,
+        "timeout_rate": 0.0,
+        "dup_charge_rate": 0.0,
+        "refund_rate": 0.0027
+      },
+      {
+        "variant": "B",
+        "latency_p50_ms": 1149.0,
+        "latency_p95_ms": 1579.0,
+        "timeout_rate": 0.0,
+        "dup_charge_rate": 0.0002,
+        "refund_rate": 0.0022
+      }
+    ],
+    "guardrail_checks": [
+      {
+        "name": "latency_p95_ms",
+        "control": 1780.0,
+        "treatment": 1579.0,
+        "threshold": 0.1,
+        "unit": "ms",
+        "ok": true
+      },
+      {
+        "name": "timeout_rate",
+        "control": 0.0,
+        "treatment": 0.0,
+        "threshold": 0.1,
+        "unit": "ratio",
+        "ok": true
+      },
+      {
+        "name": "dup_charge_rate",
+        "control": 0.0,
+        "treatment": 0.0002,
+        "threshold": 0.1,
+        "unit": "ratio",
+        "ok": true
+      },
+      {
+        "name": "refund_rate",
+        "control": 0.0027,
+        "treatment": 0.0022,
+        "threshold": 0.1,
+        "unit": "ratio",
+        "ok": true
+      }
+    ],
+    "decision": "ship candidate: recommend staged rollout with human approval",
+    "decision_reasons": [
+      "assignment integrity, significance and all guardrails passed"
+    ],
+    "provenance": {
+      "templates": [
+        "experiment_assignments",
+        "experiment_outcomes",
+        "experiment_guardrails",
+        "experiment_refunds",
+        "experiment_latency"
+      ],
+      "statistics": "two-proportion z-test, Wilson CI, chi-square SRM"
+    }
+  },
+  "recommended_actions": [
+    "Verify CHG-8841 on payment-gateway-adapter: inspect gateway-b timeout logs around the change point and the deployment diff before and after.",
+    "Assess whether traffic can be safely rerouted away from the degraded gateway, then monitor success rate and latency for at least one full traffic cycle after mitigation.",
+    "Proceed to a staged rollout of the treatment variant with human approval; keep guardrail monitoring active during ramp-up.",
+    "Re-run this investigation after the 577 pending attempts settle; late settlement can shift the exact rates."
+  ],
+  "provenance": {
+    "run_id": "f73319e2-2680-43ae-82c5-5e2182530c43",
+    "metric_version": 2,
+    "grain": "hour",
+    "data_source": null,
+    "window": {
+      "start": "2026-11-21T01:00:00+00:00",
+      "end": "2026-11-22T01:00:00+00:00"
+    },
+    "baseline": {
+      "start": "2026-11-20T01:00:00+00:00",
+      "end": "2026-11-21T01:00:00+00:00"
+    },
+    "governed_queries": [
+      {
+        "agent": "funnel",
+        "template": "funnel_counts",
+        "rows": 1,
+        "duration_ms": 26,
+        "sql": "\n        SELECT\n            COUNT(*)                                                              AS started,\n            SUM(CASE WHEN method_selected_at IS NOT NULL THEN 1 ELSE 0 END)        AS method_selected,\n            SUM(CASE WHEN initiated_at      IS NOT NULL THEN 1 ELSE 0 END)        AS initiated,\n            SUM(CASE WHEN settled           THEN 1 ELSE 0 END)                    AS settled,\n            SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            SUM(CASE WHEN settled AND status <> 'succeeded' THEN 1 ELSE 0 END)     AS failed\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n        "
+      },
+      {
+        "agent": "funnel",
+        "template": "funnel_counts",
+        "rows": 1,
+        "duration_ms": 24,
+        "sql": "\n        SELECT\n            COUNT(*)                                                              AS started,\n            SUM(CASE WHEN method_selected_at IS NOT NULL THEN 1 ELSE 0 END)        AS method_selected,\n            SUM(CASE WHEN initiated_at      IS NOT NULL THEN 1 ELSE 0 END)        AS initiated,\n            SUM(CASE WHEN settled           THEN 1 ELSE 0 END)                    AS settled,\n            SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            SUM(CASE WHEN settled AND status <> 'succeeded' THEN 1 ELSE 0 END)     AS failed\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n        "
+      },
+      {
+        "agent": "segment",
+        "template": "success_rate_by_dimension",
+        "rows": 1,
+        "duration_ms": 77,
+        "sql": "\n        SELECT method                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT method,\n                   started_at >= :window_start AND started_at < :window_end          AS in_current,\n                   started_at >= :baseline_start AND started_at < :window_start      AS in_baseline,\n                   settled, status\n            FROM payment_attempts\n            WHERE started_at >= :baseline_start AND started_at < :window_end\n                  AND (:method IS NULL OR method = :method)\n        ) t\n        WHERE in_current OR in_baseline\n        GROUP BY method\n        "
+      },
+      {
+        "agent": "segment",
+        "template": "success_rate_by_dimension",
+        "rows": 2,
+        "duration_ms": 81,
+        "sql": "\n        SELECT gateway                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT gateway,\n                   started_at >= :window_start AND started_at < :window_end          AS in_current,\n                   started_at >= :baseline_start AND started_at < :window_start      AS in_baseline,\n                   settled, status\n            FROM payment_attempts\n            WHERE started_at >= :baseline_start AND started_at < :window_end\n                  AND (:method IS NULL OR method = :method)\n        ) t\n        WHERE in_current OR in_baseline\n        GROUP BY gateway\n        "
+      },
+      {
+        "agent": "segment",
+        "template": "success_rate_by_dimension",
+        "rows": 5,
+        "duration_ms": 78,
+        "sql": "\n        SELECT bank                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT bank,\n                   started_at >= :window_start AND started_at < :window_end          AS in_current,\n                   started_at >= :baseline_start AND started_at < :window_start      AS in_baseline,\n                   settled, status\n            FROM payment_attempts\n            WHERE started_at >= :baseline_start AND started_at < :window_end\n                  AND (:method IS NULL OR method = :method)\n        ) t\n        WHERE in_current OR in_baseline\n        GROUP BY bank\n        "
+      },
+      {
+        "agent": "segment",
+        "template": "success_rate_by_dimension",
+        "rows": 3,
+        "duration_ms": 78,
+        "sql": "\n        SELECT app_version                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT app_version,\n                   started_at >= :window_start AND started_at < :window_end          AS in_current,\n                   started_at >= :baseline_start AND started_at < :window_start      AS in_baseline,\n                   settled, status\n            FROM payment_attempts\n            WHERE started_at >= :baseline_start AND started_at < :window_end\n                  AND (:method IS NULL OR method = :method)\n        ) t\n        WHERE in_current OR in_baseline\n        GROUP BY app_version\n        "
+      },
+      {
+        "agent": "segment",
+        "template": "success_rate_by_dimension",
+        "rows": 5,
+        "duration_ms": 79,
+        "sql": "\n        SELECT geo                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT geo,\n                   started_at >= :window_start AND started_at < :window_end          AS in_current,\n                   started_at >= :baseline_start AND started_at < :window_start      AS in_baseline,\n                   settled, status\n            FROM payment_attempts\n            WHERE started_at >= :baseline_start AND started_at < :window_end\n                  AND (:method IS NULL OR method = :method)\n        ) t\n        WHERE in_current OR in_baseline\n        GROUP BY geo\n        "
+      },
+      {
+        "agent": "segment",
+        "template": "success_rate_by_dimension",
+        "rows": 3,
+        "duration_ms": 78,
+        "sql": "\n        SELECT customer_tier                                                               AS dim_value,\n               SUM(CASE WHEN in_current AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS cur_succeeded,\n               SUM(CASE WHEN in_current AND settled THEN 1 ELSE 0 END)                        AS cur_settled,\n               SUM(CASE WHEN in_baseline AND settled AND status='succeeded' THEN 1 ELSE 0 END) AS base_succeeded,\n               SUM(CASE WHEN in_baseline AND settled THEN 1 ELSE 0 END)                       AS base_settled\n        FROM (\n            SELECT customer_tier,\n                   started_at >= :window_start AND started_at < :window_end          AS in_current,\n                   started_at >= :baseline_start AND started_at < :window_start      AS in_baseline,\n                   settled, status\n            FROM payment_attempts\n            WHERE started_at >= :baseline_start AND started_at < :window_end\n                  AND (:method IS NULL OR method = :method)\n        ) t\n        WHERE in_current OR in_baseline\n        GROUP BY customer_tier\n        "
+      },
+      {
+        "agent": "segment",
+        "template": "segment_profile",
+        "rows": 2,
+        "duration_ms": 27,
+        "sql": "\n        SELECT method, gateway,\n               SUM(CASE WHEN settled AND status='succeeded' THEN 1 ELSE 0 END) AS succeeded,\n               SUM(CASE WHEN settled THEN 1 ELSE 0 END)                        AS settled,\n               SUM(CASE WHEN settled THEN 0 ELSE 1 END)                        AS pending,\n               COUNT(*)                                                        AS attempts\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n              AND (:gateway IS NULL OR gateway = :gateway)\n        GROUP BY method, gateway\n        ORDER BY attempts DESC\n        "
+      },
+      {
+        "agent": "segment",
+        "template": "segment_profile",
+        "rows": 2,
+        "duration_ms": 28,
+        "sql": "\n        SELECT method, gateway,\n               SUM(CASE WHEN settled AND status='succeeded' THEN 1 ELSE 0 END) AS succeeded,\n               SUM(CASE WHEN settled THEN 1 ELSE 0 END)                        AS settled,\n               SUM(CASE WHEN settled THEN 0 ELSE 1 END)                        AS pending,\n               COUNT(*)                                                        AS attempts\n        FROM payment_attempts\n        WHERE started_at >= :window_start AND started_at < :window_end\n              AND (:method IS NULL OR method = :method)\n              AND (:gateway IS NULL OR gateway = :gateway)\n        GROUP BY method, gateway\n        ORDER BY attempts DESC\n        "
+      },
+      {
+        "agent": "anomaly",
+        "template": "hourly_success_rate",
+        "rows": 47,
+        "duration_ms": 22,
+        "sql": "\n        SELECT\n            CAST(strftime('%Y-%m-%dT%H', started_at) AS TEXT)                                          AS hour_bucket,\n            SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END)                  AS succeeded,\n            COUNT(*)                                                             AS settled,\n            SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0) AS success_rate\n        FROM payment_attempts\n        WHERE settled\n          AND started_at >= :window_start AND started_at < :window_end\n          AND method = :method\n          AND (:gateway IS NULL OR gateway = :gateway)\n        GROUP BY hour_bucket\n        ORDER BY hour_bucket\n        "
+      },
+      {
+        "agent": "anomaly",
+        "template": "deployments_in_window",
+        "rows": 3,
+        "duration_ms": 0,
+        "sql": "\n        SELECT change_id, service, gateway, deployed_at, note\n        FROM deployments\n        WHERE deployed_at >= :baseline_start AND deployed_at < :window_end\n        ORDER BY deployed_at\n        "
+      },
+      {
+        "agent": "experiment",
+        "template": "list_experiments",
+        "rows": 1,
+        "duration_ms": 1,
+        "sql": "\n        SELECT DISTINCT experiment_id\n        FROM experiment_assignments\n        ORDER BY experiment_id\n        LIMIT 5\n        "
+      },
+      {
+        "agent": "experiment",
+        "template": "experiment_assignments",
+        "rows": 2,
+        "duration_ms": 4,
+        "sql": "\n        SELECT variant, COUNT(*) AS assigned\n        FROM experiment_assignments\n        WHERE experiment_id = :experiment_id\n        GROUP BY variant\n        "
+      },
+      {
+        "agent": "experiment",
+        "template": "experiment_outcomes",
+        "rows": 2,
+        "duration_ms": 13,
+        "sql": "\n        SELECT a.variant,\n               COUNT(*)                                                       AS attempts,\n               SUM(CASE WHEN a.status='succeeded' THEN 1 ELSE 0 END)           AS succeeded,\n               SUM(CASE WHEN a.status='succeeded' THEN 1 ELSE 0 END) * 1.0\n                   / NULLIF(COUNT(*), 0)                                       AS success_rate\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.settled\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)\n        GROUP BY a.variant\n        "
+      },
+      {
+        "agent": "experiment",
+        "template": "experiment_guardrails",
+        "rows": 2,
+        "duration_ms": 14,
+        "sql": "\n        SELECT\n            a.variant,\n            COUNT(*)                                                        AS attempts,\n            SUM(CASE WHEN a.error_code='GATEWAY_TIMEOUT' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0) AS timeout_rate,\n            SUM(CASE WHEN a.is_duplicate_charge THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*),0)          AS dup_charge_rate\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.settled\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)\n        GROUP BY a.variant\n        "
+      },
+      {
+        "agent": "experiment",
+        "template": "experiment_refunds",
+        "rows": 2,
+        "duration_ms": 0,
+        "sql": "\n        SELECT a.variant, COUNT(e.event_id) AS refunds\n        FROM payment_events e\n        JOIN payment_attempts a ON a.attempt_id = e.attempt_id\n        WHERE e.event_type = 'refund_issued'\n              AND a.experiment_id = :experiment_id\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)\n        GROUP BY a.variant\n        "
+      },
+      {
+        "agent": "experiment",
+        "template": "experiment_latency",
+        "rows": 20000,
+        "duration_ms": 19,
+        "sql": "\n        SELECT a.variant, a.latency_ms\n        FROM payment_attempts a\n        WHERE a.experiment_id = :experiment_id\n              AND a.latency_ms IS NOT NULL\n              AND (:window_start IS NULL OR a.started_at >= :window_start)\n              AND (:window_end IS NULL OR a.started_at < :window_end)\n        "
+      }
+    ],
+    "agent_errors": [],
+    "planner": "deterministic",
+    "plan_rationale": "Deterministic plan: 24h window, focus method 'upi'; funnel first, then segments, anomaly and experiment checks."
+  },
+  "real_experiments": null
+}
