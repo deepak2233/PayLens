@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from dataclasses import dataclass, field
+from itertools import batched
 from typing import Callable, Iterable
 
 from paylens.config import SETTINGS
@@ -66,17 +67,23 @@ class KafkaBus:
             acks="all",
             retries=5,
             linger_ms=20,
+            **SETTINGS.kafka_security,
         )
 
     def publish(self, topic: str, message: dict) -> None:
-        self.producer.send(topic, message)
+        self._send(topic, message).get(timeout=60)
+
+    def _send(self, topic: str, message: dict):
+        key = message.get("attempt_id") or message["pseudo_customer_id"]
+        return self.producer.send(topic, message, key=key.encode("utf-8"))
 
     def publish_many(self, topic: str, messages: Iterable[dict]) -> int:
         n = 0
-        for m in messages:
-            self.publish(topic, m)
-            n += 1
-        self.producer.flush()
+        for batch in batched(messages, 500):
+            futures = [self._send(topic, message) for message in batch]
+            for future in futures:
+                future.get(timeout=60)
+            n += len(batch)
         return n
 
 

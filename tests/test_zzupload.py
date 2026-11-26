@@ -1,9 +1,4 @@
-"""Bring-your-own-data: CSV uploads flow through the SAME governed pipeline.
-
-Runs last (zz prefix) on purpose: an upload run replaces the store contents
-(demo semantics: reproducible, never additive), like the self-contained
-real-data suite.
-"""
+"""CSV inputs run through an isolated copy of the governed pipeline."""
 from __future__ import annotations
 
 import csv
@@ -116,13 +111,14 @@ def test_too_few_valid_rows(tmp_path):
         rows_to_events(rows[:40])
 
 
-def test_api_upload_endpoint(tmp_path):
+def test_api_upload_endpoint(tmp_path, store):
     from fastapi.testclient import TestClient
 
     from paylens.api.main import app
 
     path = _write_csv(tmp_path / "api.csv")
     with TestClient(app) as client:
+        before = client.get("/api/health").json()["attempts_stored"]
         with open(path, "rb") as fh:
             resp = client.post("/api/uploads",
                                files={"file": ("api.csv", fh.read(), "text/csv")})
@@ -132,3 +128,4 @@ def test_api_upload_endpoint(tmp_path):
         assert body["report"]["finding"]
         health = client.get("/api/health")
         assert health.status_code == 200
+        assert health.json()["attempts_stored"] == before > 0

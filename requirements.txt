@@ -1,13 +1,10 @@
-# Demo layer (in-memory bus + SQLite) - no Kafka needed
-pydantic>=2.7
-sqlalchemy>=2.0
-fastapi>=0.110
-uvicorn[standard]>=0.29
-langgraph>=0.2
-langchain-core>=0.2
-httpx>=0.27
-pytest>=8.0
-
-# Production layer (docker-compose) - install with requirements-prod.txt
-# kafka-python-ng>=2.2   # uncomment or install separately for Kafka transport
-# psycopg2-binary>=2.9   # uncomment for PostgreSQL
+# Runtime dependencies tested with Python 3.12
+fastapi==0.165.0
+pydantic==2.14.4
+SQLAlchemy==2.1.9
+uvicorn==0.54.0
+langgraph==1.2.24
+langchain-core==1.8.5
+httpx==0.29.0
+python-multipart==0.0.34
+psycopg2-binary==2.9.13

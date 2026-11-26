@@ -50,11 +50,12 @@ def data_horizon(session) -> datetime:
 
 
 class PayLensSupervisor:
-    def __init__(self, llm: LLMClient | None = None) -> None:
+    def __init__(self, llm: LLMClient | None = None, *, sessions=session_scope) -> None:
         from langgraph.checkpoint.memory import MemorySaver
         from langgraph.graph import END, START, StateGraph
 
         self.llm = llm or LLMClient()
+        self.sessions = sessions
         builder = StateGraph(InvestigationState)
         builder.add_node("plan", self._plan_node)
         builder.add_node("funnel", self._agent_node("funnel", run_funnel))
@@ -86,7 +87,7 @@ class PayLensSupervisor:
         {window_hours, window_end, grain, focus_method, run_experiment,
         data_source}. Synthetic-path callers omit it."""
         run_id = str(uuid.uuid4())
-        with session_scope() as session:
+        with self.sessions() as session:
             session.add(Investigation(run_id=run_id, question=question,
                                       metric_version=metric_version, status="running"))
             session.commit()
@@ -99,7 +100,7 @@ class PayLensSupervisor:
             "errors": [],
         }
         final = self.graph.invoke(state, config={"configurable": {"thread_id": run_id}})
-        with session_scope() as session:
+        with self.sessions() as session:
             inv = session.get(Investigation, run_id)
             inv.report = final.get("report", {})
             inv.status = "completed"
@@ -118,7 +119,7 @@ class PayLensSupervisor:
             # and the experiment routing (LLM still words the report).
             window_end = config.get("window_end")
             if window_end is None:
-                with session_scope() as session:
+                with self.sessions() as session:
                     window_end = data_horizon(session)
             window_start = window_end - timedelta(hours=config["window_hours"])
             baseline_start = window_start - timedelta(hours=config["window_hours"])
@@ -139,7 +140,7 @@ class PayLensSupervisor:
                 "grain": config.get("grain", "hour"),
                 "real_experiments": config.get("real_experiments", []),
             }
-        with session_scope() as session:
+        with self.sessions() as session:
             horizon = data_horizon(session)
         plan = self.llm.plan(state["question"], horizon.isoformat())
         window_end = horizon
@@ -162,7 +163,7 @@ class PayLensSupervisor:
 
         def node(state: InvestigationState) -> dict:
             try:
-                with session_scope() as session:
+                with self.sessions() as session:
                     sql = GovernedSqlTool(session, state["run_id"], agent=name)
                     return {state_key: fn(state, sql)}
             except Exception as exc:  # retry with the same inputs
@@ -175,7 +176,7 @@ class PayLensSupervisor:
         return node
 
     def _report_node(self, state: InvestigationState) -> dict:
-        with session_scope() as session:
+        with self.sessions() as session:
             sql = GovernedSqlTool(session, state["run_id"], agent="report")
             report = build_report(state, self.llm, session, sql)
         return {"report": report}

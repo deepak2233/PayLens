@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     Index,
@@ -45,16 +46,16 @@ class PaymentAttempt(Base):
     attempt_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     txn_id: Mapped[str] = mapped_column(String(64), index=True)
     pseudo_customer_id: Mapped[str] = mapped_column(String(64), index=True)
-    method: Mapped[str] = mapped_column(String(20), index=True)
-    gateway: Mapped[str] = mapped_column(String(30), index=True)
+    method: Mapped[str] = mapped_column(String(32), index=True)
+    gateway: Mapped[str] = mapped_column(String(64), index=True)
     bank: Mapped[str] = mapped_column(String(30), default="")
-    amount_paise: Mapped[int]
+    amount_paise: Mapped[int] = mapped_column(BigInteger)
     currency: Mapped[str] = mapped_column(String(8), default="INR")
     app_version: Mapped[str] = mapped_column(String(20), default="")
     geo: Mapped[str] = mapped_column(String(12), default="")
     customer_tier: Mapped[str] = mapped_column(String(12), default="")
     experiment_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
-    variant: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    variant: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     # funnel state
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
@@ -93,9 +94,42 @@ class ExperimentAssignment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     experiment_id: Mapped[str] = mapped_column(String(64), index=True)
-    variant: Mapped[str] = mapped_column(String(2))
+    variant: Mapped[str] = mapped_column(String(32))
     pseudo_customer_id: Mapped[str] = mapped_column(String(64), index=True)
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AssignmentConflict(Base):
+    __tablename__ = "assignment_conflicts"
+
+    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    experiment_id: Mapped[str] = mapped_column(String(64), index=True)
+
+
+class ExperimentProtocolRecord(Base):
+    __tablename__ = "experiment_protocols"
+
+    experiment_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    policy: Mapped[dict] = mapped_column(JSON)
+    registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class DataWatermark(Base):
+    __tablename__ = "data_watermarks"
+
+    stream: Mapped[str] = mapped_column(String(32), primary_key=True)
+    complete_through: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    valid: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class RejectedMessage(Base):
+    __tablename__ = "rejected_messages"
+
+    topic: Mapped[str] = mapped_column(String(249), primary_key=True)
+    partition: Mapped[int] = mapped_column(Integer, primary_key=True)
+    offset: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    payload_sha256: Mapped[str] = mapped_column(String(64))
+    reason: Mapped[str] = mapped_column(String(40))
 
 
 class MetricDefinition(Base):
@@ -152,3 +186,5 @@ class Investigation(Base):
 Index("ix_attempts_started_method_gateway", PaymentAttempt.started_at, PaymentAttempt.method, PaymentAttempt.gateway)
 Index("ix_attempts_last_event", PaymentAttempt.last_event_at)  # serves data_horizon()
 Index("ix_events_attempt_ts", PaymentEventRecord.attempt_id, PaymentEventRecord.ts)
+Index("ix_assignments_readout", ExperimentAssignment.experiment_id, ExperimentAssignment.assigned_at)
+Index("ix_attempts_customer_started", PaymentAttempt.pseudo_customer_id, PaymentAttempt.started_at)

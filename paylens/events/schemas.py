@@ -40,25 +40,25 @@ class PaymentEvent(BaseModel):
     every value is bound as a SQL parameter downstream.
     """
 
-    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()), min_length=1, max_length=64)
     event_type: EventType
     ts: datetime = Field(default_factory=_utcnow)
-    attempt_id: str
-    txn_id: str
-    pseudo_customer_id: str  # pseudonymised upstream; PayLens never sees PII
+    attempt_id: str = Field(min_length=1, max_length=64)
+    txn_id: str = Field(min_length=1, max_length=64)
+    pseudo_customer_id: str = Field(min_length=1, max_length=64)
     method: str = Field(min_length=1, max_length=32)  # demo: upi/debit_card/...
     gateway: str = Field(min_length=1, max_length=64)  # e.g. "gateway-a"
-    bank: str = ""
-    amount_paise: int = Field(gt=0)  # integer minor units, never floats
-    currency: str = "INR"
-    app_version: str = "3.2.0"
-    geo: str = "IN-MH"
-    customer_tier: str = "retail"
-    status: Optional[str] = None  # provider status for gateway_response
-    error_code: Optional[str] = None
+    bank: str = Field("", max_length=30)
+    amount_paise: int = Field(gt=0, le=9_223_372_036_854_775_807)
+    currency: str = Field("INR", max_length=8)
+    app_version: str = Field("3.2.0", max_length=20)
+    geo: str = Field("IN-MH", max_length=12)
+    customer_tier: str = Field("retail", max_length=12)
+    status: Optional[str] = Field(None, max_length=20)
+    error_code: Optional[str] = Field(None, max_length=40)
     # negative latencies are clock-skew artifacts, never real signals: the
     # contract rejects them so they are dead-lettered, not stored
-    latency_ms: Optional[int] = Field(default=None, ge=0)
+    latency_ms: Optional[int] = Field(default=None, ge=0, le=2_147_483_647)
     is_duplicate_charge: bool = False
 
     model_config = {"frozen": True}
@@ -71,11 +71,11 @@ class ExperimentExposure(BaseModel):
     use 2..k named arms.
     """
 
-    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()), min_length=1, max_length=64)
     ts: datetime = Field(default_factory=_utcnow)
-    experiment_id: str
+    experiment_id: str = Field(min_length=1, max_length=64)
     variant: str = Field(min_length=1, max_length=32)
-    pseudo_customer_id: str
+    pseudo_customer_id: str = Field(min_length=1, max_length=64)
     assigned_at: datetime = Field(default_factory=_utcnow)
 
     model_config = {"frozen": True}

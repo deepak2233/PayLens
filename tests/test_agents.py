@@ -74,12 +74,12 @@ def test_anomaly_detects_incident_hour_and_deployment(investigation):
     assert anomaly["interpretation"].startswith("Timing evidence")
 
 
-def test_experiment_readout_is_significant_and_ship_candidate(investigation):
+def test_experiment_readout_is_significant_and_exploratory(investigation):
     report = investigation["report"]
     exp = report["experiment"]
     assert exp["srm"]["ok"] is True
     assert exp["effect"]["significant"] is True
-    assert exp["decision"].startswith("ship candidate")
+    assert exp["decision"].startswith("exploratory")
     assert exp["control"]["success_rate"] < exp["treatment"]["success_rate"]
     for g in exp["guardrail_checks"]:
         assert g["ok"], f"guardrail {g['name']} unexpectedly breached"

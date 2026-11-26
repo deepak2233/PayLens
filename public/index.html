@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Replay payment incidents, verify experiment decisions and inspect the evidence behind every metric.">
+  <meta name="theme-color" content="#0f121a">
+  <title>PayLens | Payment Operations</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <aside class="rail" aria-label="Workspace">
+    <a class="brand" href="#incident">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span><strong>PayLens</strong><small>PAYMENT OPERATIONS</small></span>
+    </a>
+    <nav aria-label="Views">
+      <a href="#incident" data-view="incident"><span class="nav-icon wave" aria-hidden="true"></span>Incident replay</a>
+      <a href="#experiment" data-view="experiment"><span class="nav-icon split" aria-hidden="true"></span>Experiment readout</a>
+      <a href="#benchmarks" data-view="benchmarks"><span class="nav-icon layers" aria-hidden="true"></span>Open data</a>
+      <a href="#evidence" data-view="evidence"><span class="nav-icon file" aria-hidden="true"></span>Evidence log</a>
+    </nav>
+    <div class="rail-footer">
+      <a href="#live" data-view="live">Connect live feed <span aria-hidden="true">↗</span></a>
+      <a href="https://github.com/deepak2233/PayLens" target="_blank" rel="noopener">Source repository <span aria-hidden="true">↗</span></a>
+    </div>
+  </aside>
+  <main id="main">
+    <header class="top">
+      <span id="workspace">Analytics workspace</span>
+      <span class="connection" id="connection" role="status"><i></i>Connecting</span>
+    </header>
+    <div class="content">
+      <div class="view" id="incident">
+        <div class="heading">
+          <div>
+            <span class="source-badge">Synthetic replay</span>
+            <h1>Payment incident replay</h1>
+            <p>Trace a drop in payment success to gateway performance, routing volume, or delayed confirmations.</p>
+          </div>
+          <button type="button" class="button secondary" data-export disabled>Export evidence <span aria-hidden="true">↓</span></button>
+        </div>
+        <form id="scope" class="scope" aria-label="Replay scope">
+          <label>Scenario<select name="scenario">
+            <option value="incident">Gateway regression</option>
+            <option value="mix">Traffic-mix shift</option>
+            <option value="delay">Delayed confirmations</option>
+          </select></label>
+          <label>Rail<select name="method">
+            <option value="">All payment rails</option><option value="upi">UPI</option><option value="card">Card</option>
+          </select></label>
+          <label>Cohort window<select name="window_hours">
+            <option value="24">24 hours</option><option value="12">12 hours</option><option value="6">6 hours</option><option value="48">48 hours</option>
+          </select></label>
+          <label>Outcome SLA<select name="outcome_minutes">
+            <option value="30">30 minutes</option><option value="5">5 minutes</option><option value="180">3 hours</option>
+          </select></label>
+          <label>Replay clock<select name="back_minutes">
+            <option value="0">End of replay</option><option value="180">3 hours earlier</option><option value="360">6 hours earlier</option><option value="720">12 hours earlier</option>
+          </select></label>
+        </form>
+        <div class="status-line" id="incident-status" role="status">Loading replay…</div>
+        <div id="incident-content"></div>
+      </div>
+
+      <div class="view" id="experiment" hidden>
+        <div class="heading">
+          <div>
+            <span class="source-badge">Synthetic experiment</span>
+            <h1>Experiment readout</h1>
+            <p>Evaluate a checkout change on all assigned users, including users who never started a payment.</p>
+          </div>
+          <button type="button" class="button secondary" data-export disabled>Export evidence <span aria-hidden="true">↓</span></button>
+        </div>
+        <div class="scope narrow">
+          <label>Observation cutoff<select id="trial-stage"><option value="final">Final readout</option><option value="early">Before outcomes mature</option></select></label>
+        </div>
+        <div class="status-line" id="experiment-status" role="status">Loading experiment…</div>
+        <div id="experiment-content"></div>
+      </div>
+
+      <div class="view" id="benchmarks" hidden>
+        <div class="heading">
+          <div>
+            <span class="source-badge public">Public datasets</span>
+            <h1>Open data benchmarks</h1>
+            <p>Check the analytics against published shopping sessions, randomized experiments and payment network data.</p>
+          </div>
+        </div>
+        <div class="status-line" id="benchmarks-status" role="status">Loading benchmarks…</div>
+        <div id="benchmarks-content"></div>
+      </div>
+
+      <div class="view" id="evidence" hidden>
+        <div class="heading">
+          <div>
+            <h1>Evidence log</h1>
+            <p>Review the approved queries, bound parameters and source cutoff behind the active report.</p>
+          </div>
+          <button type="button" class="button secondary" data-export disabled>Export evidence <span aria-hidden="true">↓</span></button>
+        </div>
+        <div id="evidence-content"></div>
+      </div>
+
+      <div class="view" id="live" hidden>
+        <div class="heading">
+          <div>
+            <span class="source-badge private">Private analytics</span>
+            <h1>Live feed</h1>
+            <p>Query your PostgreSQL payment store and save evidence for each investigation.</p>
+          </div>
+          <button type="button" class="button secondary" data-export disabled>Export evidence <span aria-hidden="true">↓</span></button>
+        </div>
+        <form class="scope live-scope" id="live-scope">
+          <label>Access token<input name="token" type="password" autocomplete="off" required></label>
+          <label>Report<select name="report"><option value="incident">Incident replay</option><option value="experiment">Experiment readout</option></select></label>
+          <label id="live-id" hidden>Registered experiment ID<input name="experiment_id" maxlength="64" placeholder="checkout-v2"></label>
+          <button class="button primary" type="submit">Run on live feed</button>
+        </form>
+        <div class="status-line" id="live-status" role="status">Requires a live store configured for this deployment.</div>
+        <div id="live-content"></div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

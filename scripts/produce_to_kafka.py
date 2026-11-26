@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from paylens.config import SETTINGS  # noqa: E402
-from paylens.events.bus import KafkaBus, TOPIC_EXPOSURES, TOPIC_PAYMENTS  # noqa: E402
+from paylens.events.bus import KafkaBus  # noqa: E402
 from paylens.events.generator import PaymentEventGenerator  # noqa: E402
 
 
@@ -26,7 +26,10 @@ def main() -> None:
     parser.add_argument("--experiment-users-per-arm", type=int, default=50_000)
     args = parser.parse_args()
 
+    from datetime import datetime
+
     gen = PaymentEventGenerator(
+        anchor=datetime.fromisoformat(SETTINGS.anchor_iso) if SETTINGS.anchor_iso else None,
         attempts_per_day=args.attempts_per_day,
         experiment_users_per_arm=args.experiment_users_per_arm,
         seed=SETTINGS.seed,
@@ -34,8 +37,11 @@ def main() -> None:
     data = gen.generate()
 
     bus = KafkaBus()
-    n1 = bus.publish_many(TOPIC_PAYMENTS, data.payment_events)
-    n2 = bus.publish_many(TOPIC_EXPOSURES, data.exposures)
+    try:
+        n1 = bus.publish_many(SETTINGS.topic_payment_events, data.payment_events)
+        n2 = bus.publish_many(SETTINGS.topic_experiments, data.exposures)
+    finally:
+        bus.producer.close()
     print(f"published {n1} payment events and {n2} exposures to Kafka")
 
     from paylens.storage.db import session_scope

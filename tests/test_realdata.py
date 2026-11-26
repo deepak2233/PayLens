@@ -71,7 +71,6 @@ def isolated_engine(tmp_path, monkeypatch):
             s.close()
 
     for target in ("paylens.storage.db.engine",
-                   "paylens.storage.ingest.engine",
                    "paylens.realdata.loader.engine"):
         monkeypatch.setattr(target, engine)
     monkeypatch.setattr("paylens.realdata.loader.session_scope", scope)
@@ -205,7 +204,7 @@ def test_upworthy_multi_arm_bonferroni():
     # corrected p = raw p * 2 (still tiny here)
     raw = float(rx["effect"]["p_value_uncorrected"])
     assert float(rx["effect"]["p_value"]) == pytest.approx(min(1.0, raw * 2), rel=0.05)
-    assert rx["decision"].startswith("ship candidate")
+    assert rx["decision"].startswith("exploratory")
 
 
 def test_upworthy_negative_effect_holds():

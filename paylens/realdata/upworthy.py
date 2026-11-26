@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 from collections import defaultdict
+from datetime import date
 
 from paylens.realdata.contracts import UpworthyRow
 from paylens.stats import ab_test as stats
@@ -25,10 +26,24 @@ MIN_ARM_UNITS = 1000  # mirrors the pre-registered minimum scale
 SOURCE_LABEL = "Upworthy Research Archive (CC BY 4.0)"
 
 
-def _validate_rows(path) -> list[UpworthyRow]:
+def at_randomization_risk(raw: dict) -> bool:
+    """The archive authors documented systematic assignment problems in this period."""
+    if raw.get("problem") in ("1", "true", "TRUE"):
+        return True
+    try:
+        day = date.fromisoformat(raw.get("created_at", "")[:10])
+    except ValueError:
+        return True
+    return date(2013, 6, 25) <= day <= date(2014, 1, 10)
+
+
+def _validate_rows(path) -> tuple[list[UpworthyRow], set[str]]:
     rows: list[UpworthyRow] = []
+    risky = set()
     with path.open(newline="", encoding="utf-8") as f:
         for raw in csv.DictReader(f):
+            if at_randomization_risk(raw):
+                risky.add(raw.get("clickability_test_id"))
             raw = {k: v for k, v in raw.items() if k not in ("", None)}
             try:
                 rows.append(UpworthyRow(
@@ -40,7 +55,7 @@ def _validate_rows(path) -> list[UpworthyRow]:
                 ))
             except Exception:
                 continue  # counted in the loader's validation report, not here
-    return rows
+    return rows, risky
 
 
 def _readout(test_id: str, arms: list[UpworthyRow]) -> dict:
@@ -78,12 +93,9 @@ def _readout(test_id: str, arms: list[UpworthyRow]) -> dict:
     elif ztest["delta"] < 0:
         decision = "hold: treatment significantly worse than control"
         reasons = ["real negative effect; do not ship this variant"]
-    elif ztest["delta"] < mde:
-        decision = "ship candidate: recommend staged rollout with human approval"
-        reasons = ["significant, but below the pre-registered minimum detectable effect"]
     else:
-        decision = "ship candidate: recommend staged rollout with human approval"
-        reasons = ["assignment integrity, significance and scale passed"]
+        decision = "exploratory: positive headline effect"
+        reasons = ["Aggregate archival readout; original business guardrails are unavailable"]
 
     def arm(v: UpworthyRow) -> dict:
         return {
@@ -134,13 +146,13 @@ def analyze_archive(path, top_n: int = 3) -> dict:
     different from control at Bonferroni-corrected alpha, ranked by absolute
     real effect size, tie-broken by total impressions.
     """
-    rows = _validate_rows(path)
+    rows, risky = _validate_rows(path)
     by_test: dict[str, list[UpworthyRow]] = defaultdict(list)
     for r in rows:
         by_test[r.clickability_test_id].append(r)
 
     evaluable = {t: arms for t, arms in by_test.items()
-                 if len(arms) >= 2 and all(a.impressions > 0 for a in arms)}
+                 if t not in risky and len(arms) >= 2 and all(a.impressions > 0 for a in arms)}
     significant = 0
     srm_failures = 0
     candidates = []
@@ -160,6 +172,7 @@ def analyze_archive(path, top_n: int = 3) -> dict:
         "packages": len(rows),
         "tests_total": len(by_test),
         "tests_evaluated": len(evaluable),
+        "tests_excluded_for_randomization_risk": len(risky),
         "tests_srm_ok_significant": significant,
         "tests_srm_failures": srm_failures,
         "selected": [c[2] for c in candidates[:top_n]],

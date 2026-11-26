@@ -25,15 +25,18 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import DBAPIError
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from paylens import __version__
 from paylens.agents.state import InvestigationState
+from paylens.api.access import HOSTED, require_access
 from paylens.agents.supervisor import data_horizon
-from paylens.config import SETTINGS
+from paylens.config import REPO_ROOT, SETTINGS
 from paylens.metrics.definitions import SUCCESS_RATE_V2
 from paylens.pipeline import run_investigation, seed_database
 from paylens.storage.db import create_all, session_scope
@@ -46,11 +49,13 @@ from paylens.storage.models import (
 from paylens.tools.governed_sql import GovernedSqlTool
 
 _DASHBOARD = Path(__file__).parent / "dashboard.html"
+_PUBLIC = REPO_ROOT / "public"
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    create_all()  # schema bootstrap; the store itself is owned by the ingest worker
+    if not HOSTED and SETTINGS.is_sqlite:
+        create_all()
     yield
 
 
@@ -62,22 +67,51 @@ app = FastAPI(
 )
 
 
+private = APIRouter(dependencies=[Depends(require_access)])
+
+
 class InvestigateRequest(BaseModel):
     question: str = Field(
         default="Investigate the UPI success-rate drop over the last 24 hours. "
                 "Compare with yesterday and identify affected segments.",
         min_length=5, max_length=500,
     )
-    metric_version: int = Field(default=SUCCESS_RATE_V2, ge=1, le=5)
+    metric_version: int = Field(default=SUCCESS_RATE_V2, ge=2, le=2)
 
 
-@app.get("/", response_class=HTMLResponse)
-def dashboard() -> HTMLResponse:
+# Vercel serves public/ at the CDN and excludes it from the function bundle.
+if (_PUBLIC / "index.html").is_file():
+    @app.get("/", include_in_schema=False)
+    def dashboard():
+        return FileResponse(_PUBLIC / "index.html")
+
+if (_PUBLIC / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=_PUBLIC / "assets"), name="assets")
+
+
+@private.get("/legacy", response_class=HTMLResponse)
+def legacy_dashboard():
     return HTMLResponse(_DASHBOARD.read_text(encoding="utf-8"))
+
+
+@app.exception_handler(DBAPIError)
+async def database_unavailable(_request, _exc):
+    return JSONResponse({"detail": "Analytics store unavailable or query exceeded its deadline"}, status_code=503)
+
+
+@app.middleware("http")
+async def response_headers(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @app.get("/api/health")
 def health() -> dict:
+    if HOSTED or SETTINGS.is_postgres or SETTINGS.api_token:
+        return {"status": "ok", "service": "paylens"}
     with session_scope() as session:
         horizon = data_horizon(session)
         attempts = session.execute(select(func.count()).select_from(PaymentAttempt)).scalar()
@@ -90,11 +124,13 @@ def health() -> dict:
     }
 
 
-@app.post("/api/demo/seed")
+@private.post("/api/demo/seed")
 def demo_seed(
     attempts_per_day: int = Query(default=20_000, ge=500, le=200_000),
     experiment_users_per_arm: int = Query(default=10_000, ge=500, le=100_000),
 ) -> dict:
+    if HOSTED or SETTINGS.is_postgres:
+        raise HTTPException(403, "Seed is available only in the local SQLite demo")
     stats = seed_database(
         attempts_per_day=attempts_per_day,
         experiment_users_per_arm=experiment_users_per_arm,
@@ -102,13 +138,13 @@ def demo_seed(
     return JSONResponse(stats)
 
 
-@app.post("/api/investigations")
+@private.post("/api/investigations")
 def create_investigation(req: InvestigateRequest) -> dict:
     result = run_investigation(req.question, metric_version=req.metric_version)
     return JSONResponse(result)
 
 
-@app.post("/api/uploads")
+@private.post("/api/uploads")
 def upload_csv(file: UploadFile) -> dict:
     """Bring-your-own-data: analyze an uploaded payments CSV export.
 
@@ -118,13 +154,11 @@ def upload_csv(file: UploadFile) -> dict:
     same artifact the demo and real-source paths produce. Store semantics
     match the demo: reproducible, never additive (each upload replaces the
     dataset). Hard size cap: 200 MB."""
-    import csv  # noqa: F401  (kept for clarity: _stream yields raw CSV lines)
-
-    from fastapi import HTTPException
-
     from paylens.realdata.csv_upload import CsvUploadError, run_csv_investigation
 
-    max_bytes = 200 * 1024 * 1024
+    max_bytes = 8 * 1024 * 1024
+    if file.size is not None and file.size > max_bytes:
+        raise HTTPException(413, "CSV exceeds the 8 MiB upload limit")
     total = 0
 
     def _stream():
@@ -133,7 +167,7 @@ def upload_csv(file: UploadFile) -> dict:
             total += len(raw)
             if total > max_bytes:
                 raise HTTPException(status_code=413,
-                                    detail="file exceeds the 200 MB upload cap")
+                                    detail="CSV exceeds the 8 MiB upload limit")
             yield raw.decode("utf-8-sig", errors="replace")
 
     try:
@@ -143,8 +177,8 @@ def upload_csv(file: UploadFile) -> dict:
     return JSONResponse(result)
 
 
-@app.get("/api/investigations")
-def list_investigations(limit: int = Query(default=20, le=100)) -> list[dict]:
+@private.get("/api/investigations")
+def list_investigations(limit: int = Query(default=20, ge=1, le=100)) -> list[dict]:
     with session_scope() as session:
         rows = session.execute(
             select(Investigation).order_by(Investigation.created_at.desc()).limit(limit)
@@ -157,7 +191,7 @@ def list_investigations(limit: int = Query(default=20, le=100)) -> list[dict]:
         ]
 
 
-@app.get("/api/investigations/{run_id}")
+@private.get("/api/investigations/{run_id}")
 def get_investigation(run_id: str) -> dict:
     with session_scope() as session:
         inv = session.get(Investigation, run_id)
@@ -172,10 +206,10 @@ def get_investigation(run_id: str) -> dict:
         }
 
 
-@app.get("/api/metrics/success-rate")
+@private.get("/api/metrics/success-rate")
 def success_rate(
     window_hours: int = Query(default=24, ge=1, le=72),
-    metric_version: int = Query(default=SUCCESS_RATE_V2, ge=1, le=5),
+    metric_version: int = Query(default=SUCCESS_RATE_V2, ge=2, le=2),
     group_by: Literal["method", "gateway", "geo", "customer_tier", "app_version"] | None = None,
 ) -> dict:
     with session_scope() as session:
@@ -212,7 +246,7 @@ def success_rate(
         }
 
 
-@app.get("/api/funnel")
+@private.get("/api/funnel")
 def funnel(window_hours: int = Query(default=24, ge=1, le=72)) -> dict:
     with session_scope() as session:
         end = data_horizon(session)
@@ -231,7 +265,7 @@ def funnel(window_hours: int = Query(default=24, ge=1, le=72)) -> dict:
                 }}
 
 
-@app.get("/api/experiments/{experiment_id}/readout")
+@private.get("/api/experiments/{experiment_id}/readout")
 def experiment_readout(experiment_id: str) -> dict:
     from paylens.agents.experiment import run_experiment
 
@@ -247,8 +281,8 @@ def experiment_readout(experiment_id: str) -> dict:
         return JSONResponse(run_experiment(state, sql))
 
 
-@app.get("/api/audit/queries")
-def audit_queries(limit: int = Query(default=50, le=500)) -> list[dict]:
+@private.get("/api/audit/queries")
+def audit_queries(limit: int = Query(default=50, ge=1, le=500)) -> list[dict]:
     with session_scope() as session:
         rows = session.execute(
             select(QueryAuditLog).order_by(QueryAuditLog.executed_at.desc()).limit(limit)
@@ -261,8 +295,8 @@ def audit_queries(limit: int = Query(default=50, le=500)) -> list[dict]:
         ]
 
 
-@app.get("/api/deployments")
-def deployments(limit: int = Query(default=20, le=100)) -> list[dict]:
+@private.get("/api/deployments")
+def deployments(limit: int = Query(default=20, ge=1, le=100)) -> list[dict]:
     with session_scope() as session:
         rows = session.execute(
             select(DeploymentRecordDB)
@@ -273,3 +307,10 @@ def deployments(limit: int = Query(default=20, le=100)) -> list[dict]:
              "deployed_at": d.deployed_at.isoformat(), "note": d.note}
             for d in rows
         ]
+
+
+from paylens.replay.api import live, router  # noqa: E402
+
+app.include_router(router)
+app.include_router(live)
+app.include_router(private)

@@ -101,7 +101,7 @@ def cmd_real_data(args: argparse.Namespace) -> None:
 def cmd_api(_args: argparse.Namespace) -> None:
     import uvicorn
 
-    uvicorn.run("paylens.api.main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("paylens.api.main:app", host="127.0.0.1", port=8000, reload=False)
 
 
 def cmd_investigate(args: argparse.Namespace) -> None:
@@ -112,6 +112,7 @@ def cmd_investigate(args: argparse.Namespace) -> None:
 
 
 def cmd_analyze(args: argparse.Namespace) -> None:
+    from paylens.realdata.loader import dump_report
     from paylens.realdata.csv_upload import CsvUploadError, run_csv_investigation
 
     try:

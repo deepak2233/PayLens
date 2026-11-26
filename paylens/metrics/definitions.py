@@ -76,14 +76,14 @@ METRICS: list[MetricSpec] = [
 
 
 def seed_metric_definitions(session: Session) -> None:
-    from paylens.storage.ingest import _dialect_insert
+    from paylens.storage.ingest import upsert
 
     rows = [
         {"metric_name": m.name, "version": m.version,
          "description": m.description, "formula_sql": m.formula_sql}
         for m in METRICS
     ]
-    stmt = _dialect_insert(MetricDefinition.__table__).values(rows)
+    stmt = upsert(session, MetricDefinition).values(rows)
     if session.bind.dialect.name in ("sqlite", "postgresql"):
         stmt = stmt.on_conflict_do_nothing(index_elements=["metric_name", "version"])
     session.execute(stmt)

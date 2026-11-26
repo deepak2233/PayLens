@@ -6,8 +6,8 @@ Checks, in order:
   3. Treatment effect                  - two-proportion z-test on success.
   4. Guardrails                        - latency, duplicate charges, refunds,
                                           gateway timeouts.
-Only after all gates pass does the agent return a "ship candidate"
-recommendation. The human rollout decision stays with the bank team.
+This legacy attempt-grain readout is exploratory. Use the registered
+user-grain readout for rollout review.
 """
 from __future__ import annotations
 
@@ -165,5 +165,5 @@ def _decide(srm: dict, ztest: dict, mde: float, guardrails, n_a: int, n_b: int) 
     failed = [g.name for g in guardrails if not g.ok]
     if failed:
         return "hold: guardrail breach", [f"guardrail degraded: {', '.join(failed)}"] + reasons
-    reasons.append("assignment integrity, significance and all guardrails passed")
-    return "ship candidate: recommend staged rollout with human approval", reasons
+    reasons.append("Legacy settled-attempt comparison needs a registered user-level readout")
+    return "exploratory: registered user protocol required", reasons
