@@ -17,6 +17,16 @@ jobs:
             requirements.txt
             requirements-prod.txt
             requirements-dev.txt
+      - name: Check Vercel and container dependency pins
+        run: |
+          python - <<'PYCODE'
+          import tomllib
+          from pathlib import Path
+          declared = tomllib.loads(Path("pyproject.toml").read_text())["project"]["dependencies"]
+          pins = [line for line in Path("requirements.txt").read_text().splitlines()
+                  if line and not line.startswith("#")]
+          assert declared == pins, "Keep Vercel and container dependency pins identical"
+          PYCODE
       - run: python -m pip install -r requirements-dev.txt
       - run: ruff check paylens tests scripts cli.py
       - run: python -m pytest -ra
