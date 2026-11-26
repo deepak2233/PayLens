@@ -79,12 +79,14 @@ class InvestigateRequest(BaseModel):
     metric_version: int = Field(default=SUCCESS_RATE_V2, ge=2, le=2)
 
 
-@app.get("/", include_in_schema=False)
-def dashboard():
-    return FileResponse(_PUBLIC / "index.html")
+# Vercel serves public/ at the CDN and excludes it from the function bundle.
+if (_PUBLIC / "index.html").is_file():
+    @app.get("/", include_in_schema=False)
+    def dashboard():
+        return FileResponse(_PUBLIC / "index.html")
 
-
-app.mount("/assets", StaticFiles(directory=_PUBLIC / "assets"), name="assets")
+if (_PUBLIC / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=_PUBLIC / "assets"), name="assets")
 
 
 @private.get("/legacy", response_class=HTMLResponse)
