@@ -15,3 +15,6 @@ filterwarnings = [
     # the deprecation warning fires at import time in older fastapi stacks; tracked
     "ignore::DeprecationWarning:fastapi",
 ]
+
+[tool.vercel]
+entrypoint = "paylens.api.main:app"

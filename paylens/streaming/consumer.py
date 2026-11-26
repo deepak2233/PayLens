@@ -1,83 +1,83 @@
-"""Kafka ingest worker for the Docker layer.
-
-Runs the same IngestConsumer pipeline used by the demo, but pulls from real
-Kafka topics with a consumer group. Duplicate handling, out-of-order state
-derivation and delayed-outcome semantics are identical to the demo.
-
-Usage (inside the consumer container):
-    python -m paylens.streaming.consumer
-"""
+"""At-least-once Kafka ingestion. PostgreSQL commits before Kafka offsets."""
 from __future__ import annotations
 
-import json
+import hashlib
 import logging
 import signal
-import time
+from contextlib import closing
+
+from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
 from paylens.config import SETTINGS
-from paylens.storage.db import create_all, session_scope
-from paylens.storage.ingest import IngestConsumer
+from paylens.events.schemas import ExperimentExposure, PaymentEvent
+from paylens.storage.db import session_scope
+from paylens.storage.ingest import IngestConsumer, invalidate_watermarks, upsert
+from paylens.storage.models import RejectedMessage
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("paylens.consumer")
 
-_running = True
 
-
-def _stop(signum, _frame) -> None:
-    global _running
-    _running = False
+def ingest_batch(session: Session, records: list) -> dict:
+    payments, exposures, rejected = [], [], []
+    for record in records:
+        is_payment = record.topic == SETTINGS.topic_payment_events
+        model = PaymentEvent if is_payment else ExperimentExposure
+        try:
+            item = model.model_validate_json(record.value or b"")
+            required = {"event_id", "ts"} if is_payment else {"event_id", "ts", "assigned_at"}
+            if not required.issubset(item.model_fields_set):
+                raise ValueError("missing stable event ID or timestamp")
+        except (ValidationError, ValueError):
+            rejected.append({
+                "topic": record.topic, "partition": record.partition, "offset": record.offset,
+                "payload_sha256": hashlib.sha256(record.value or b"").hexdigest(),
+                "reason": "invalid_event_contract",
+            })
+            continue
+        (payments if is_payment else exposures).append(item.model_dump())
+    stats = IngestConsumer(None, session).process_records(payments, exposures)
+    if rejected:
+        session.execute(upsert(session, RejectedMessage).on_conflict_do_nothing(
+            index_elements=["topic", "partition", "offset"]), rejected)
+        invalidate_watermarks(session, ("payments", "assignments", "guardrails"))
+    return {**stats, "rejected": len(rejected)}
 
 
 def main() -> None:
-    from kafka import KafkaConsumer  # requires the prod requirements
+    from kafka import KafkaConsumer
+    from kafka.structs import OffsetAndMetadata
 
-    create_all()
-    signal.signal(signal.SIGTERM, _stop)
-    signal.signal(signal.SIGINT, _stop)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    running = True
 
-    consumer = KafkaConsumer(
+    def stop(_signum, _frame):
+        nonlocal running
+        running = False
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    with closing(KafkaConsumer(
         SETTINGS.topic_payment_events,
-        SETTINGS.topic_exposures,
+        SETTINGS.topic_experiments,
         bootstrap_servers=SETTINGS.kafka_bootstrap,
         group_id=SETTINGS.consumer_group,
-        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
         auto_offset_reset="earliest",
-        enable_auto_commit=False,  # commit only after a successful DB write
-        max_poll_records=5_000,
-    )
-    log.info("consumer up: group=%s bootstrap=%s",
-             SETTINGS.consumer_group, SETTINGS.kafka_bootstrap)
-
-    buffer: list[dict] = []
-    last_commit = time.time()
-    while _running:
-        records = consumer.poll(timeout_ms=1_000)
-        for _tp, batch in records.items():
-            for rec in batch:
-                buffer.append(rec.value)
-        due = len(buffer) >= 5_000 or (buffer and time.time() - last_commit >= 5)
-        if not due:
-            continue
-        # route records by schema: exposures carry variant+experiment_id,
-        # payment events carry attempt_id
-        exposures = [r for r in buffer if "experiment_id" in r and "variant" in r]
-        payments = [r for r in buffer if "attempt_id" in r]
-        unknown = len(buffer) - len(exposures) - len(payments)
-        if unknown:
-            log.warning("discarded %s unrecognised records", unknown)
-        with session_scope() as session:
-            stats = IngestConsumer(bus=None, session=session).process_records(
-                payments, exposures)
-        log.info("ingested payments=%s exposures=%s duplicates=%s invalid=%s",
-                 stats.get("events_ingested", 0), stats.get("assignments", 0),
-                 stats.get("duplicates", 0), stats.get("invalid", 0))
-        buffer.clear()
-        consumer.commit()
-        last_commit = time.time()
-    consumer.close()
-    log.info("consumer stopped")
+        enable_auto_commit=False,
+        max_poll_records=2_000,
+        **SETTINGS.kafka_security,
+    )) as consumer:
+        log.info("Kafka ingest ready group=%s", SETTINGS.consumer_group)
+        while running:
+            batches = consumer.poll(timeout_ms=1_000)
+            if not batches:
+                continue
+            records = [record for partition in batches.values() for record in partition]
+            with session_scope() as session:
+                stats = ingest_batch(session, records)
+            consumer.commit({partition: OffsetAndMetadata(batch[-1].offset + 1, "")
+                             for partition, batch in batches.items() if batch})
+            log.info("batch committed %s", stats)
 
 
 if __name__ == "__main__":

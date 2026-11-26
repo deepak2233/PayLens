@@ -26,6 +26,8 @@ def seed_database(delete_first: bool = True, anchor: datetime | None = None,
     back to PAYLENS_ANCHOR_TS, else wall-clock now."""
     if anchor is None and SETTINGS.anchor_iso:
         anchor = datetime.fromisoformat(SETTINGS.anchor_iso)
+    if delete_first and not SETTINGS.is_sqlite:
+        raise ValueError("Demo reset requires an isolated SQLite database")
     if delete_first:
         from paylens.storage.db import engine
         from paylens.storage.models import Base

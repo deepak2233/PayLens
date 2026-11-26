@@ -25,6 +25,8 @@ class Settings:
     database_url: str = field(
         default_factory=lambda: _env("PAYLENS_DATABASE_URL", "sqlite:///./paylens_demo.db")
     )
+    analytics_database_url: str = field(default_factory=lambda: _env("PAYLENS_ANALYTICS_DATABASE_URL"))
+    api_token: str = field(default_factory=lambda: _env("PAYLENS_API_TOKEN"))
 
     # --- event transport ---------------------------------------------------
     # "memory" for the demo layer, "kafka" for the docker-compose layer.
@@ -35,6 +37,10 @@ class Settings:
     topic_payment_events: str = field(default_factory=lambda: _env("PAYLENS_TOPIC_PAYMENTS", "payment-events"))
     topic_experiments: str = field(default_factory=lambda: _env("PAYLENS_TOPIC_EXPOSURES", "experiment-exposures"))
     consumer_group: str = field(default_factory=lambda: _env("PAYLENS_CONSUMER_GROUP", "paylens-ingest"))
+    kafka_security_protocol: str = field(default_factory=lambda: _env("PAYLENS_KAFKA_SECURITY_PROTOCOL", "PLAINTEXT"))
+    kafka_sasl_mechanism: str = field(default_factory=lambda: _env("PAYLENS_KAFKA_SASL_MECHANISM", "SCRAM-SHA-512"))
+    kafka_username: str = field(default_factory=lambda: _env("PAYLENS_KAFKA_USERNAME"))
+    kafka_password: str = field(default_factory=lambda: _env("PAYLENS_KAFKA_PASSWORD"))
 
     # --- agents / LLM ------------------------------------------------------
     # "none"  : deterministic planner + templated narration (no network calls)
@@ -60,6 +66,14 @@ class Settings:
     @property
     def is_postgres(self) -> bool:
         return self.database_url.startswith("postgresql")
+
+    @property
+    def kafka_security(self) -> dict:
+        config = {"security_protocol": self.kafka_security_protocol}
+        if self.kafka_security_protocol.startswith("SASL_"):
+            config.update(sasl_mechanism=self.kafka_sasl_mechanism,
+                          sasl_plain_username=self.kafka_username, sasl_plain_password=self.kafka_password)
+        return config
 
 
 SETTINGS = Settings()

@@ -122,6 +122,7 @@ def build_report(state: InvestigationState, llm: LLMClient, session, sql) -> dic
 
     actions = _recommended_actions(anomaly, experiment, funnel)
 
+    session.flush()
     audit_rows = session.execute(
         select(QueryAuditLog).where(QueryAuditLog.run_id == state["run_id"])
     ).scalars().all()

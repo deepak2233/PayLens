@@ -183,3 +183,14 @@ def guardrail_ok(name: str, control: float, treatment: float,
     ok = not degraded
     return Guardrail(name=name, control=control, treatment=treatment,
                      threshold=threshold, unit=unit, ok=ok)
+
+
+def difference_interval(success_a: int, n_a: int, success_b: int, n_b: int,
+                        alpha: float = 0.05) -> tuple[float, float]:
+    """Newcombe hybrid-score confidence interval for independent B minus A risks."""
+    p_a, p_b = success_a / n_a, success_b / n_b
+    a_low, a_high = wilson_interval(success_a, n_a, alpha)
+    b_low, b_high = wilson_interval(success_b, n_b, alpha)
+    delta = p_b - p_a
+    return (delta - math.hypot(p_b - b_low, a_high - p_a),
+            delta + math.hypot(b_high - p_b, p_a - a_low))

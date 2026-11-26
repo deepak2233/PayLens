@@ -1,0 +1,502 @@
+{
+  "as_of": "2026-11-26",
+  "shoppers": {
+    "url": "https://archive.ics.uci.edu/dataset/468/online+shoppers+purchasing+intention+dataset",
+    "data_url": "https://archive.ics.uci.edu/static/public/468/online+shoppers+purchasing+intention+dataset.zip",
+    "license": "CC BY 4.0",
+    "sha256": "2972e6184d3ad7beaaa831d9fc2b059dc3ee29df69d1ec593c466a5cd8485d14",
+    "sessions": 12330,
+    "purchases": 1908,
+    "conversion_pct": 15.474452554744525,
+    "groups": [
+      {
+        "group": "Returning_Visitor",
+        "sessions": 10551,
+        "purchases": 1470,
+        "conversion_pct": 13.93232868922377
+      },
+      {
+        "group": "New_Visitor",
+        "sessions": 1694,
+        "purchases": 422,
+        "conversion_pct": 24.911452184179456
+      },
+      {
+        "group": "Other",
+        "sessions": 85,
+        "purchases": 16,
+        "conversion_pct": 18.823529411764707
+      }
+    ]
+  },
+  "upworthy": {
+    "url": "https://upworthy.natematias.com/about-the-archive.html",
+    "data_url": "https://osf.io/download/3vqmp/",
+    "correction_url": "https://doi.org/10.1038/s41597-024-03600-w",
+    "license": "CC BY 4.0",
+    "sha256": "8368313b060f4015a0c6fb34e6d788163cee29554144aba9390b14922eb9d8ce",
+    "tests_total": 4873,
+    "excluded_risk": 1050,
+    "evaluated_tests": 3823,
+    "srm_flagged": 18,
+    "sample_rule": "First 12 eligible test IDs sorted by SHA-256, independent of outcomes.",
+    "samples": [
+      {
+        "id": "5314692e5187adda77000006",
+        "arms": [
+          [
+            4085,
+            67
+          ],
+          [
+            3950,
+            106
+          ],
+          [
+            4050,
+            70
+          ],
+          [
+            4022,
+            114
+          ]
+        ]
+      },
+      {
+        "id": "543ed8d043fbb67931000016",
+        "arms": [
+          [
+            3145,
+            17
+          ],
+          [
+            3120,
+            11
+          ],
+          [
+            2977,
+            10
+          ],
+          [
+            3114,
+            13
+          ]
+        ]
+      },
+      {
+        "id": "52d84c88730208ceff000b2c",
+        "arms": [
+          [
+            2766,
+            91
+          ],
+          [
+            2785,
+            75
+          ],
+          [
+            2802,
+            90
+          ],
+          [
+            2789,
+            101
+          ]
+        ]
+      },
+      {
+        "id": "53860d3c92398a9dda00001b",
+        "arms": [
+          [
+            6197,
+            85
+          ],
+          [
+            6227,
+            44
+          ],
+          [
+            6220,
+            32
+          ],
+          [
+            6353,
+            29
+          ]
+        ]
+      },
+      {
+        "id": "5445200201f23f7fd2000022",
+        "arms": [
+          [
+            3024,
+            40
+          ],
+          [
+            3087,
+            29
+          ],
+          [
+            3123,
+            33
+          ],
+          [
+            3037,
+            26
+          ],
+          [
+            3161,
+            47
+          ],
+          [
+            3001,
+            28
+          ],
+          [
+            3074,
+            50
+          ]
+        ]
+      },
+      {
+        "id": "51436071220cb80002000788",
+        "arms": [
+          [
+            2736,
+            79
+          ],
+          [
+            2593,
+            35
+          ],
+          [
+            2595,
+            50
+          ],
+          [
+            2678,
+            56
+          ]
+        ]
+      },
+      {
+        "id": "5418b4353088cfcf1f000002",
+        "arms": [
+          [
+            4790,
+            74
+          ],
+          [
+            4909,
+            84
+          ],
+          [
+            4948,
+            64
+          ],
+          [
+            4816,
+            73
+          ],
+          [
+            4791,
+            74
+          ]
+        ]
+      },
+      {
+        "id": "53990fb7d5d900b82500002d",
+        "arms": [
+          [
+            5682,
+            73
+          ],
+          [
+            5771,
+            47
+          ],
+          [
+            5801,
+            36
+          ],
+          [
+            5700,
+            62
+          ]
+        ]
+      },
+      {
+        "id": "5429edba3f8719944f000031",
+        "arms": [
+          [
+            5634,
+            17
+          ],
+          [
+            5507,
+            37
+          ],
+          [
+            5432,
+            37
+          ],
+          [
+            5621,
+            40
+          ],
+          [
+            5591,
+            23
+          ],
+          [
+            5409,
+            28
+          ]
+        ]
+      },
+      {
+        "id": "53bd8adb90cf53b289000023",
+        "arms": [
+          [
+            3551,
+            61
+          ],
+          [
+            3545,
+            40
+          ],
+          [
+            3543,
+            34
+          ],
+          [
+            3726,
+            49
+          ]
+        ]
+      },
+      {
+        "id": "54c85b1d34666100190c0000",
+        "arms": [
+          [
+            2858,
+            29
+          ],
+          [
+            2765,
+            16
+          ],
+          [
+            2789,
+            11
+          ],
+          [
+            2931,
+            22
+          ],
+          [
+            2872,
+            18
+          ]
+        ]
+      },
+      {
+        "id": "54b7086d656562001f080000",
+        "arms": [
+          [
+            3172,
+            13
+          ],
+          [
+            3127,
+            13
+          ],
+          [
+            3095,
+            28
+          ],
+          [
+            3136,
+            16
+          ],
+          [
+            3099,
+            14
+          ],
+          [
+            3252,
+            18
+          ]
+        ]
+      }
+    ]
+  },
+  "pix": {
+    "url": "https://dadosabertos.bcb.gov.br/dataset/estatisticas-do-spi-sistema-de-pagamentos-instantaneos",
+    "license": "ODbL 1.0",
+    "months": [
+      {
+        "month": "2026-10",
+        "index_pct": 99.99176,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-09",
+        "index_pct": 99.991,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-08",
+        "index_pct": 99.991,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-07",
+        "index_pct": 99.99925,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-06",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-05",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-04",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-03",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-02",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2026-01",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2025-12",
+        "index_pct": 99.98138,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2025-11",
+        "index_pct": 99.98118,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2025-10",
+        "index_pct": 99.98138,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2025-09",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2025-08",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2025-07",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2025-06",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      },
+      {
+        "month": "2025-05",
+        "index_pct": 100.0,
+        "floor_pct": 99.9
+      }
+    ],
+    "outages": [
+      {
+        "start": "2026-08-22T23:44:33",
+        "end": "2026-08-22T23:55:28",
+        "seconds": 655
+      },
+      {
+        "start": "2026-07-28T02:35:08",
+        "end": "2026-07-28T02:36:08",
+        "seconds": 60
+      },
+      {
+        "start": "2025-10-30T16:07:40",
+        "end": "2025-10-30T16:32:20",
+        "seconds": 1480
+      },
+      {
+        "start": "2025-01-11T01:04:30",
+        "end": "2025-01-11T01:09:30",
+        "seconds": 300
+      },
+      {
+        "start": "2024-11-14T21:43:50",
+        "end": "2024-11-14T21:48:32",
+        "seconds": 282
+      },
+      {
+        "start": "2024-10-14T10:13:30",
+        "end": "2024-10-14T11:01:00",
+        "seconds": 2850
+      },
+      {
+        "start": "2024-10-11T06:47:42",
+        "end": "2024-10-11T06:49:15",
+        "seconds": 93
+      },
+      {
+        "start": "2024-09-23T13:58:50",
+        "end": "2024-09-23T14:00:00",
+        "seconds": 70
+      },
+      {
+        "start": "2024-09-15T03:35:15",
+        "end": "2024-09-15T03:37:45",
+        "seconds": 150
+      },
+      {
+        "start": "2024-09-15T00:53:15",
+        "end": "2024-09-15T01:00:45",
+        "seconds": 450
+      },
+      {
+        "start": "2024-07-27T21:43:00",
+        "end": "2024-07-27T22:11:00",
+        "seconds": 1680
+      },
+      {
+        "start": "2023-06-29T14:26:41",
+        "end": "2023-06-29T14:27:49",
+        "seconds": 68
+      }
+    ],
+    "files": [
+      {
+        "url": "https://olinda.bcb.gov.br/olinda/servico/SPI/versao/v1/odata/PixDisponibilidadeSPI",
+        "sha256": "12793fe285687df8da0ccffb85857968fa09b1f87c26aee17c3c1aadff1238ef"
+      },
+      {
+        "url": "https://olinda.bcb.gov.br/olinda/servico/SPI/versao/v1/odata/PixInterrupcaoSPIEventos?%24top=300",
+        "sha256": "538bb4644eeb8c603f4ad228add6c9d81a582d9c51c8895f54827bb1c4868e11"
+      }
+    ]
+  }
+}

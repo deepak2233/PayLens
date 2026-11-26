@@ -180,40 +180,38 @@ def rows_to_events(rows: list[dict]) -> tuple[list[PaymentEvent], list[Experimen
 
 
 def run_csv_investigation(source, question: str | None = None) -> dict:
-    """Full governed analysis of an uploaded CSV, same pipeline as the demo.
+    """Run a governed investigation in a dataset scoped to this invocation."""
+    from tempfile import TemporaryDirectory
 
-    Replaces the store contents (demo semantics: reproducible, never
-    additive), ingests the canonical event stream and runs the agent
-    investigation with governed SQL + full audit trail.
-    """
-    rows, _ = read_attempts_csv(source)
-    events, exposures, stats = rows_to_events(rows)
+    from sqlalchemy.orm import sessionmaker
 
+    from paylens.agents.supervisor import PayLensSupervisor
     from paylens.metrics.definitions import seed_metric_definitions
-    from paylens.storage.db import create_all, engine, session_scope
+    from paylens.storage.db import make_engine, session_scope
     from paylens.storage.ingest import IngestConsumer
     from paylens.storage.models import Base
 
-    Base.metadata.drop_all(engine)  # upload runs are reproducible, never additive
-    create_all()
-    with session_scope() as session:
-        seed_metric_definitions(session)
-
-    ingest_stats = {"events_received": len(events), "attempts_upserted": 0}
-    with session_scope() as session:
-        raw_events = [e.model_dump() for e in events]
-        raw_exposures = [x.model_dump() for x in exposures]
-        consumer = IngestConsumer(None, session)
-        out = consumer.process_records(raw_events, raw_exposures)
-        ingest_stats["attempts_upserted"] = out.get("attempts_upserted", 0)
-        ingest_stats["invalid"] = out.get("invalid", 0)
-        ingest_stats["duplicates"] = out.get("duplicates", 0)
-
-    from paylens.pipeline import run_investigation
-
+    rows, _ = read_attempts_csv(source)
+    events, exposures, stats = rows_to_events(rows)
     q = question or ("Investigate the payment success-rate change over the "
-                     "last 24 hours compared with the previous 24 hours and "
-                     "identify affected segments.")
-    result = run_investigation(q)
-    result["upload_stats"] = {**stats, **ingest_stats}
-    return result
+                     "last 24 hours compared with the previous 24 hours and identify affected segments.")
+    with TemporaryDirectory(prefix="paylens-upload-") as folder:
+        engine = make_engine(f"sqlite:///{Path(folder) / 'analysis.db'}")
+        try:
+            Base.metadata.create_all(engine)
+            factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+            def sessions():
+                return session_scope(factory)
+
+            with sessions() as session:
+                seed_metric_definitions(session)
+                ingested = IngestConsumer(None, session).process_records(
+                    [event.model_dump() for event in events],
+                    [event.model_dump() for event in exposures],
+                )
+            result = PayLensSupervisor(sessions=sessions).run(q)
+            result["upload_stats"] = {**stats, **ingested}
+            return result
+        finally:
+            engine.dispose()

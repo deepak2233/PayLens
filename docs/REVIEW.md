@@ -1,36 +1,26 @@
-# Engineering review — PayLens v1.0
+# PayLens engineering review
 
-A second-pass adversarial review of the codebase against a top-tier
-engineering bar (correctness under scale, operability, hygiene), performed
-after the initial build. Findings are ordered by severity; every "fixed"
-item is covered by the test suite, and the reference demo run produces
-byte-identical findings after the fixes.
+Baseline audited at commit [a0d197e](https://github.com/deepak2233/PayLens/tree/a0d197ea9a4dff3327609ab66223630666a3eb5c). The useful baseline components are canonical event ingest, parameterized SQL templates, a LangGraph investigation, and real-data adapters. These findings compare repository behavior. A model ranking would require the same prompts, tools and scoring.
 
-## Findings and actions
+| Area | Baseline behavior | Updated behavior |
+|---|---|---|
+| Delivery | Vercel copied one HTML file, and the deployed health endpoint returned 404. A second browser implementation approximated Python behavior for CSV uploads. | The console calls deployed FastAPI endpoints for calculations and shows query evidence. Server-side CSV uploads have isolated stores. |
+| Delayed outcomes | The baseline rate excludes all unresolved attempts. It can move when the observation window gets younger or a provider slows down. | The replay compares two complete start cohorts at the same SLA, with pending and late counts exposed. |
+| Incident attribution | Volume-weighted segment ranking found the worst slice but did not reconcile routing mix with changes within routes. | Exact midpoint decomposition reconciles within-route, mix and unmatched-route effects to the total delta. |
+| Experimental unit | The experiment agent computed its primary metric on settled attempts. Multiple attempts can overweight one user, and assigned users with no observed start disappeared. | The registered readout uses assignment as the denominator, one result per user and one fixed look. Unknown coverage keeps the readout inconclusive. |
+| Guardrails | Missing latency and refund observations could enter guardrail tests as zero. Positive Upworthy examples could be labelled rollout candidates. | The experiment requires a reconciled telemetry checkpoint and uncertainty bounds on tolerable increases in timeouts, duplicate charges and refunds. Public aggregate headline readouts stay exploratory. |
+| Source meaning | Olist order delivery and cancellation were encoded as familiar payment outcomes. Upworthy did not apply the documented problematic date-range filter. | The public app identifies the grain and outcome of each source. The archive builder and the legacy adapter both exclude documented randomization-risk tests. |
+| Operations | The Kafka deserializer could stop on a malformed value. The worker logged questionable data with no durable quarantine. Legacy CSV analysis dropped its global tables. | The worker quarantines record coordinates and a checksum, commits Kafka offsets after the database transaction, and handles replay. CSV processing uses an isolated database. |
 
-| ID | Severity | Area | Finding | Action |
-|----|----------|------|---------|--------|
-| R-01 | High | Ingest performance | `_derive_attempt` ran one experiment-assignment query **per attempt** (a SELECT on `experiment_assignments` for every organic attempt; ~248k queries per full run). Correct but quadratic-feeling at production rates. | One batched `variant_lookup` per ingest batch, passed into attempt derivation. Fixed. |
-| R-02 | High | Ingest performance | `_backfill_variants` scanned the **entire assignment table** and issued one UPDATE per assignment on every batch, even when nothing needed back-filling (20k statements per batch in the full demo). | Back-fill is now scoped to customers whose exposures arrived in the current batch; cost is proportional to the batch, never to the table. Fixed. |
-| R-03 | Medium | Store | `data_horizon()` calls `MAX(last_event_at)` on every investigation and health check with **no index** on `last_event_at` — a full scan per call at scale. | Added `ix_attempts_last_event` (SQLAlchemy model + `sql/init.sql`). Fixed. |
-| R-04 | Medium | Statistics | `srm_check` computed the chi-square p-value with the **df = 1** formula for any arm count — wrong for multi-arm experiments. | Exact normal relation for df = 1, Wilson–Hilferty transform for df > 1; `degrees_of_freedom` returned; multi-arm unit test added (2-arm results unchanged). Fixed. |
-| R-05 | Medium | Reproducibility | `seed_database(delete_first=True)` ignored the flag — running `cli.py demo` twice stacked two datasets on top of each other. | Flag honored (`drop_all` before `create_all`); demo runs are now idempotent. Fixed. |
-| R-06 | Low | API | `@app.on_event("startup")` — deprecated FastAPI pattern. | Replaced with a `lifespan` context manager. Fixed. |
-| R-07 | Low | Agents | Dead variable in the Anomaly Agent (`before` computed, never used). | Replaced with a `rate_context` block (mean settled rate before/after the change point) — data the report consumer actually uses. Fixed. |
-| R-08 | Low | Hygiene | 8 unused imports (pyflakes F401); dead JS in the dashboard. | Removed; `ruff check` (F, E9, W6) is now clean and enforced in CI. Fixed. |
-| R-09 | Low | Hygiene | No lint/test/CI configuration, no `.gitignore`, hardcoded dev password in compose, no package version. | `pyproject.toml` (ruff + pytest config), `.gitignore`, GitHub Actions CI (lint + demo-layer tests + Docker image builds), `${PAYLENS_PG_PASSWORD:-...}` interpolation in compose, `paylens.__version__` surfaced in the API metadata. Fixed. |
+## Research decisions
 
-## Accepted limitations (deliberate, documented)
+- **FLINT** (October 2026 preprint) reported finance text-to-SQL errors from ambiguous identifiers and used approved query templates and domain-specific lookup. PayLens uses this principle with typed scopes, versioned SQL and bound parameters. Its evaluation measures the calculations and their source lineage. [Sehanobish et al.](https://arxiv.org/abs/2610.03524)
+- **CUPED reliability** (June 2026 preprint) studies when pre-experiment adjustments preserve valid treatment estimates. PayLens uses the unadjusted assignment-based estimate because the deployed data does not supply trusted pre-treatment covariates. [Ensuring Trustworthy Online A/B Testing](https://arxiv.org/abs/2606.18750)
+- **Sample-ratio mismatch** is a diagnostic for assignment or measurement problems. PayLens checks the preregistered expected split, rejects rogue arms and records conflicting assignments. SRM alone cannot establish valid randomization. [Microsoft’s SRM taxonomy](https://www.microsoft.com/en-us/research/publication/diagnosing-sample-ratio-mismatch-in-online-controlled-experiments-a-taxonomy-and-rules-of-thumb-for-practitioners/)
+- **Anytime-valid A/B testing** provides an alternative to fixed-horizon inference when teams repeatedly inspect live results. PayLens withholds the effect before its fixed readout date. Applying sequential inference to this user-level conversion metric would require an estimator and stopping policy validated for that grain. [Lindon et al., AISTATS 2025](https://proceedings.mlr.press/v258/lindon25a.html)
 
-- **SQLite demo store.** The demo layer prioritizes a one-command run over throughput; the production path is the same code against PostgreSQL via docker-compose. Chunked upserts already respect SQLite's per-statement parameter limits.
-- **Synchronous investigation endpoint.** `POST /api/investigations` runs the graph inline (a reference run takes seconds on the demo store and stays within one minute on SQLite). Production would hand it to a job queue and poll by `run_id`; the report JSON already supports that pattern.
-- **Kafka consumer is not covered by unit tests.** It reuses the tested `IngestConsumer` pipeline and differs only in transport plumbing; CI builds its Docker image but a service-container test job is deferred until CI hardware runs the stack.
-- **Static dashboard.** The review page reads the API and renders; the 48h-baseline derivation in its JS is a demo heuristic, not a metric-definition surface.
-- **No mypy gate yet.** Type hints cover the public surface; strict whole-repo typing is a follow-up, tracked here rather than pretended.
-- **JWT/authN on the API.** Out of scope for a design artifact; the review table in the design doc (§11) treats it as the deployment's responsibility.
+## Known boundaries
 
-## Verification after the fixes
+Replay reconstructs event-time state from the currently available ledger. A completeness checkpoint represents an operator’s upstream reconciliation. Reproducing exactly what was visible on a prior day would additionally require persistent arrival timestamps and snapshot retention. The hourly onset is a descriptive screening rule and deployment timing is an association. The gateway event schema and guardrail instrumentation need reconciliation with the gateway and settlement ledgers before payment policy changes.
 
-- `ruff check paylens tests cli.py` — clean.
-- `pytest` — 36 passed (35 prior + new multi-arm SRM test).
-- Full demo run before/after the refactor — identical findings (92.63% → 81.24%, UPI × gateway-b −24.47 pp, change point 10:00, CHG-8841 correlate, SRM p = 1.0).
+The event fixtures and broker smoke test establish correctness on controlled workloads. Throughput, recovery objectives and live-payment accuracy require measurements on the intended deployment. The single write lock favors correctness at current scale. Partitioned projections and a load test should precede a high-volume rollout.

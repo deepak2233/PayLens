@@ -22,7 +22,8 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Iterable
 
-from sqlalchemy import insert, select
+from pydantic import ValidationError
+from sqlalchemy import func, select, text, tuple_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
@@ -35,8 +36,9 @@ from paylens.events.schemas import (
     ExperimentExposure,
     PaymentEvent,
 )
-from paylens.storage.db import engine
 from paylens.storage.models import (
+    AssignmentConflict,
+    DataWatermark,
     DeploymentRecordDB,
     ExperimentAssignment,
     PaymentAttempt,
@@ -59,12 +61,22 @@ def _naive_utc(dt: datetime) -> datetime:
     return dt
 
 
-def _dialect_insert(table):
-    if engine.dialect.name == "postgresql":
-        return pg_insert(table)
-    if engine.dialect.name == "sqlite":
-        return sqlite_insert(table)
+def upsert(session: Session, table):
+    insert = pg_insert if session.get_bind().dialect.name == "postgresql" else sqlite_insert
     return insert(table)
+
+
+def lock_ingest(session: Session) -> None:
+    if session.get_bind().dialect.name == "postgresql":
+        # Keep the event ledger and attempt projection atomic across workers.
+        session.execute(text("SELECT pg_advisory_xact_lock(736418219)"))
+
+
+def invalidate_watermarks(session: Session, streams: tuple[str, ...], earliest: datetime | None = None) -> None:
+    stmt = update(DataWatermark).where(DataWatermark.stream.in_(streams), DataWatermark.valid)
+    if earliest is not None:
+        stmt = stmt.where(DataWatermark.complete_through >= _naive_utc(earliest))
+    session.execute(stmt.values(valid=False))
 
 
 def _chunked(items: list, size: int = 500) -> Iterable[list]:
@@ -83,6 +95,7 @@ class IngestConsumer:
     # ------------------------------------------------------------------ api
     def process_records(self, payments: list[dict], exposures: list[dict]) -> dict:
         """Ingest pre-fetched raw records (Kafka path); same pipeline as the bus path."""
+        lock_ingest(self.session)
         stats: dict = {"assignments": 0}
         exposure_customers: list[str] = []
         if exposures:
@@ -108,16 +121,10 @@ class IngestConsumer:
 
         # 1. Experiment assignments first so attempts can join their variant.
         raw_exposures = self.bus.drain(TOPIC_EXPOSURES, batch_size)
-        stats["assignments"], exposure_customers = self._ingest_exposures(raw_exposures)
 
         # 2. Payment events.
         raw_events = self.bus.drain(TOPIC_PAYMENTS, batch_size)
-        stats["events_received"] = len(raw_events)
-        if raw_events:
-            stats.update(self._ingest_payment_events(raw_events))
-
-        # 3. Back-fill variants for attempts that arrived before their exposure.
-        stats["assignments_backfilled"] = self._backfill_variants(exposure_customers)
+        stats.update(self.process_records(raw_events, raw_exposures))
 
         stats["duration_ms"] = int((time.monotonic() - t0) * 1000)
         self.session.commit()
@@ -126,33 +133,47 @@ class IngestConsumer:
     # ------------------------------------------------------- exposures
     def _ingest_exposures(self, raw_exposures: list[dict]) -> tuple[int, list[str]]:
         """Upsert assignments (first write wins). Returns (count, customers)."""
-        seen: dict[tuple[str, str], dict] = {}
+        events = []
         for raw in raw_exposures:
             try:
-                exp = ExperimentExposure.model_validate(raw)
-            except Exception:
+                events.append(ExperimentExposure.model_validate(raw))
+            except ValidationError:
                 self.dead_letter.append(raw)
-                continue
+        if not events:
+            return 0, []
+        keys = sorted({(ev.experiment_id, ev.pseudo_customer_id) for ev in events})
+        prior = {}
+        for chunk in _chunked(keys, 200):
+            rows = self.session.execute(
+                select(ExperimentAssignment.experiment_id, ExperimentAssignment.pseudo_customer_id,
+                       ExperimentAssignment.variant)
+                .where(tuple_(ExperimentAssignment.experiment_id,
+                              ExperimentAssignment.pseudo_customer_id).in_(chunk))
+            )
+            prior.update({(exp, user): variant for exp, user, variant in rows})
+        new = []
+        conflicts = []
+        for exp in events:
             key = (exp.experiment_id, exp.pseudo_customer_id)
-            # first write wins; re-assignments are ignored (immutability rule)
-            if key not in seen:
-                seen[key] = {
+            if key not in prior:
+                prior[key] = exp.variant
+                new.append({
                     "experiment_id": exp.experiment_id,
                     "variant": exp.variant,
                     "pseudo_customer_id": exp.pseudo_customer_id,
                     "assigned_at": _naive_utc(exp.assigned_at),
-                }
-        if not seen:
-            return 0, []
-        rows = list(seen.values())
-        for chunk in _chunked(rows, size=200):
-            ins = _dialect_insert(ExperimentAssignment.__table__).values(chunk)
-            if engine.dialect.name == "postgresql":
-                ins = ins.on_conflict_do_nothing(constraint="uq_assignment")
-            elif engine.dialect.name == "sqlite":
-                ins = ins.on_conflict_do_nothing(index_elements=["experiment_id", "pseudo_customer_id"])
-            self.session.execute(ins)
-        return len(rows), [r["pseudo_customer_id"] for r in rows]
+                })
+            if prior[key] != exp.variant:
+                conflicts.append({"event_id": exp.event_id, "experiment_id": exp.experiment_id})
+        for chunk in _chunked(new, 200):
+            self.session.execute(upsert(self.session, ExperimentAssignment).values(chunk)
+                                 .on_conflict_do_nothing(index_elements=["experiment_id", "pseudo_customer_id"]))
+        for chunk in _chunked(conflicts, 200):
+            self.session.execute(upsert(self.session, AssignmentConflict).values(chunk)
+                                 .on_conflict_do_nothing(index_elements=["event_id"]))
+        if new:
+            invalidate_watermarks(self.session, ("assignments",), min(row["assigned_at"] for row in new))
+        return len(new), [user for _, user in keys]
 
     def _backfill_variants(self, customers: list[str]) -> int:
         """Tag attempts from customers whose exposure was ingested in this batch.
@@ -187,7 +208,7 @@ class IngestConsumer:
         for raw in raw_events:
             try:
                 ev = PaymentEvent.model_validate(raw)
-            except Exception:
+            except ValidationError:
                 stats["invalid"] += 1
                 self.dead_letter.append(raw)
                 continue
@@ -209,6 +230,8 @@ class IngestConsumer:
             existing_ids.update(rows)
         fresh = [e for e in valid if e.event_id not in existing_ids]
         stats["duplicates"] += len(valid) - len(fresh)
+        if fresh:
+            invalidate_watermarks(self.session, ("payments", "guardrails"), min(_naive_utc(e.ts) for e in fresh))
 
         # Deployments may ride along in the payload stream (producer emits
         # them as sentinel records) - none in this schema; kept for clarity.
@@ -235,6 +258,12 @@ class IngestConsumer:
     def _load_attempts(self, attempt_ids: list[str]) -> dict[str, dict]:
         out: dict[str, dict] = {}
         for chunk in _chunked(attempt_ids):
+            starts = dict(self.session.execute(
+                select(PaymentEventRecord.attempt_id, func.min(PaymentEventRecord.ts))
+                .where(PaymentEventRecord.attempt_id.in_(chunk),
+                       PaymentEventRecord.event_type == EventType.PAYMENT_STARTED.value)
+                .group_by(PaymentEventRecord.attempt_id)
+            ).all())
             rows = self.session.execute(
                 select(PaymentAttempt).where(PaymentAttempt.attempt_id.in_(chunk))
             ).scalars().all()
@@ -253,11 +282,12 @@ class IngestConsumer:
                     "customer_tier": r.customer_tier,
                     "experiment_id": r.experiment_id,
                     "variant": r.variant,
-                    "started_at": r.started_at,
-                    "method_selected_at": r.method_selected_at,
-                    "initiated_at": r.initiated_at,
-                    "gateway_responded_at": r.gateway_responded_at,
-                    "terminal_at": r.terminal_at,
+                    "started_at": _naive_utc(starts[r.attempt_id]) if r.attempt_id in starts else None,
+                    "_fallback_start": _naive_utc(r.started_at),
+                    "method_selected_at": _naive_utc(r.method_selected_at) if r.method_selected_at else None,
+                    "initiated_at": _naive_utc(r.initiated_at) if r.initiated_at else None,
+                    "gateway_responded_at": _naive_utc(r.gateway_responded_at) if r.gateway_responded_at else None,
+                    "terminal_at": _naive_utc(r.terminal_at) if r.terminal_at else None,
                     "status": r.status,
                     "status_rank": r.status_rank,
                     "error_code": r.error_code,
@@ -265,7 +295,7 @@ class IngestConsumer:
                     "settled": r.settled,
                     "is_duplicate_charge": r.is_duplicate_charge,
                     "event_count": r.event_count,
-                    "last_event_at": r.last_event_at,
+                    "last_event_at": _naive_utc(r.last_event_at) if r.last_event_at else None,
                 }
         return out
 
@@ -324,6 +354,7 @@ class IngestConsumer:
             "event_count": 0,
             "last_event_at": None,
         }
+        fallback = row.pop("_fallback_start", _naive_utc(first.ts))
         if row["experiment_id"] is None:
             lookup = variant_map.get(row["pseudo_customer_id"])
             if lookup is not None:
@@ -349,13 +380,15 @@ class IngestConsumer:
                 if row[col] is None or ts < row[col]:
                     row[col] = ts
             if stage == "terminal":
-                if row["status_rank"] < 4:
-                    row["status"] = "succeeded" if ev.event_type == EventType.PAYMENT_SUCCEEDED else "failed"
+                failed = ev.event_type == EventType.PAYMENT_FAILED
+                terminal = row["terminal_at"]
+                if terminal is None or ts < terminal or (ts == terminal and failed and row["status"] != "failed"):
+                    row["status"] = "failed" if failed else "succeeded"
                     row["status_rank"] = 4
-                    row["terminal_at"] = ts if row["terminal_at"] is None else min(row["terminal_at"], ts)
+                    row["terminal_at"] = ts
                     row["settled"] = True
-                if ev.event_type == EventType.PAYMENT_FAILED and ev.error_code and not row["error_code"]:
-                    row["error_code"] = ev.error_code
+                    if ev.error_code:
+                        row["error_code"] = ev.error_code
             if stage == "gateway_response":
                 if ev.error_code and not row["error_code"]:
                     row["error_code"] = ev.error_code
@@ -372,7 +405,7 @@ class IngestConsumer:
 
         row["event_count"] = (row["event_count"] or 0) + len(events)
         if row["started_at"] is None:
-            row["started_at"] = _naive_utc(first.ts)
+            row["started_at"] = min(fallback, _naive_utc(first.ts))
         return row
 
     def _upsert_attempts(self, rows: list[dict]) -> None:
@@ -383,12 +416,9 @@ class IngestConsumer:
         chunk_size = max(1, 900 // len(cols))
         for i in range(0, len(rows), chunk_size):
             chunk = rows[i : i + chunk_size]
-            stmt = _dialect_insert(PaymentAttempt.__table__).values(chunk)
-            if engine.dialect.name in ("sqlite", "postgresql"):
-                from sqlalchemy import text as _text
-
-                set_expr = {c: _text(f"excluded.{c}") for c in cols if c != "attempt_id"}
-                stmt = stmt.on_conflict_do_update(index_elements=["attempt_id"], set_=set_expr)
+            stmt = upsert(self.session, PaymentAttempt).values(chunk)
+            set_expr = {c: stmt.excluded[c] for c in cols if c != "attempt_id"}
+            stmt = stmt.on_conflict_do_update(index_elements=["attempt_id"], set_=set_expr)
             self.session.execute(stmt)
 
     def _insert_events(self, events: list[PaymentEvent]) -> None:
@@ -408,9 +438,8 @@ class IngestConsumer:
         ]
         cols = len(rows[0])
         for chunk in _chunked(rows, size=max(1, 900 // cols)):
-            stmt = _dialect_insert(PaymentEventRecord.__table__).values(chunk)
-            if engine.dialect.name in ("sqlite", "postgresql"):
-                stmt = stmt.on_conflict_do_nothing(index_elements=["event_id"])
+            stmt = upsert(self.session, PaymentEventRecord).values(chunk)
+            stmt = stmt.on_conflict_do_nothing(index_elements=["event_id"])
             self.session.execute(stmt)
 
 
@@ -420,9 +449,7 @@ def ingest_deployments(session: Session, deployments: list[dict]) -> int:
         if isinstance(row.get("deployed_at"), str):
             row["deployed_at"] = datetime.fromisoformat(row["deployed_at"])
         row["deployed_at"] = _naive_utc(row["deployed_at"])
-        stmt = _dialect_insert(DeploymentRecordDB.__table__).values(**row)
-        if engine.dialect.name in ("sqlite", "postgresql"):
-            stmt = stmt.on_conflict_do_nothing(index_elements=["change_id"])
-        session.execute(stmt)
+        session.execute(upsert(session, DeploymentRecordDB).values(**row)
+                        .on_conflict_do_nothing(index_elements=["change_id"]))
     session.commit()
     return len(deployments)

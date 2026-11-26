@@ -27,6 +27,8 @@ EVENTS_PER_BATCH = 20_000
 
 def _fresh_store() -> None:
     """Real-data runs are reproducible: drop and recreate the gold store."""
+    if engine.dialect.name != "sqlite":
+        raise ValueError("The legacy Olist replay requires an isolated SQLite database")
     Base.metadata.drop_all(engine)
     create_all()
     with session_scope() as session:
